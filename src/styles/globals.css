@@ -49,7 +49,7 @@
   --dur-slow: 1100ms;
   --dur-liquid: 1400ms;
   /* Hero headline: 16vw mobile, 13vw desktop (brief allows 12–18vw). */
-  --hero-size: 16vw;
+  --hero-size: 15vw;
   color-scheme: dark;
 }
 
@@ -92,7 +92,7 @@ html[data-theme='light'] {
   :root { --gutter: 32px; }
 }
 @media (min-width: 1024px) {
-  :root { --gutter: 48px; --hero-size: min(13vw, 22rem); }
+  :root { --gutter: 48px; --hero-size: min(11vw, 16rem); }
 }
 
 html { background: var(--ink); }

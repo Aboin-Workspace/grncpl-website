@@ -150,6 +150,9 @@ export const HeroHeadline = forwardRef<HeroHeadlineHandle, Props>(function HeroH
       splits.current.forEach((s) => s?.revert())
       splits.current = []
       splitReady.current = false
+      // Allow a clean re-entry (StrictMode double-mount, resize re-split): the next run replays the reveal.
+      prevIndex.current = null
+      subShown.current = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slides, reduced])
@@ -174,9 +177,9 @@ export const HeroHeadline = forwardRef<HeroHeadlineHandle, Props>(function HeroH
         tl.add(enter(index), 0)
       }
       if (!subShown.current && subRef.current) {
-        subShown.current = true
         const S = HERO.headline.subtext
-        tl.fromTo(subRef.current, { opacity: 0, y: S.y }, { opacity: 1, y: 0, duration: S.duration, ease: S.ease }, prev === null ? S.delay : HERO.headline.exit.duration - HERO.headline.overlap + S.delay)
+        // Separate tween (not in `master`) so a slide change mid-reveal never kills it.
+        gsap.fromTo(subRef.current, { opacity: 0, y: S.y }, { opacity: 1, y: 0, duration: S.duration, ease: S.ease, delay: prev === null ? S.delay : HERO.headline.exit.duration - HERO.headline.overlap + S.delay, onComplete: () => { subShown.current = true } })
       }
       master.current = tl
       prevIndex.current = index

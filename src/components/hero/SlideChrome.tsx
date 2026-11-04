@@ -1,8 +1,9 @@
 import { forwardRef } from 'react'
 import { MagneticButton } from '@/components/motion/MagneticButton'
+import type { HeroSlide } from '@/data/home'
 
 interface Props {
-  count: number
+  slides: HeroSlide[]
   index: number
   paused: boolean
   onSelect: (i: number) => void
@@ -13,58 +14,73 @@ interface Props {
 const pad = (n: number) => String(n + 1).padStart(2, '0')
 
 const Chevron = ({ dir }: { dir: 'left' | 'right' }) => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     {dir === 'left' ? <path d="M15 5l-7 7 7 7" /> : <path d="M9 5l7 7-7 7" />}
   </svg>
 )
 
 /**
- * Layer 5 — slide indicator (01–04 with a CSS-variable progress bar that Hero.tsx
- * tweens), magnetic prev/next buttons.
+ * Layer 5 — hero chrome. HUD corner brackets + index readout, and a thumbnail
+ * navigator along the bottom: every slide is a card (photo, number, title) and
+ * the active card carries the autoplay progress bar (CSS var --p, tweened in
+ * Hero.tsx). Prev/next are magnetic buttons at the right end.
  */
-export const SlideChrome = forwardRef<HTMLDivElement, Props>(function SlideChrome({ count, index, paused, onSelect, onPrev, onNext }, ref) {
+export const SlideChrome = forwardRef<HTMLDivElement, Props>(function SlideChrome({ slides, index, paused, onSelect, onPrev, onNext }, ref) {
+  const count = slides.length
   return (
     <div ref={ref} className="pointer-events-none absolute inset-0 z-20">
-      {/* Indicator: vertical right on desktop, horizontal bottom on mobile */}
-      <div
-        className="pointer-events-auto absolute inset-x-gutter bottom-[4.5rem] flex items-end gap-3 md:bottom-[5.5rem] lg:inset-x-auto lg:bottom-auto lg:right-gutter lg:top-1/2 lg:-translate-y-1/2 lg:flex-col lg:items-end lg:gap-5"
-        role="tablist"
-        aria-label="Slides"
-      >
-        {Array.from({ length: count }).map((_, i) => {
-          const active = i === index
-          return (
-            <button
-              key={i}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              aria-label={`Slide ${pad(i)}`}
-              onClick={() => onSelect(i)}
-              className="group flex flex-1 items-end gap-2 py-2 lg:flex-none lg:flex-row-reverse lg:items-center lg:gap-3 lg:py-0"
-            >
-              <span className={`font-display text-sm tracking-[0.12em] transition-colors duration-fast ${active ? 'text-amber' : 'text-bone/50 group-hover:text-bone'}`}>{pad(i)}</span>
-              <span className="relative block h-px w-full overflow-hidden bg-bone/20 lg:h-10 lg:w-px" aria-hidden="true">
-                <span
-                  data-progress-bar={i}
-                  className="absolute inset-0 origin-left bg-amber lg:origin-top"
-                  style={{ transform: 'scaleX(var(--p, 0))', ['--p' as string]: 0 }}
-                  data-paused={paused ? '' : undefined}
-                />
-              </span>
-            </button>
-          )
-        })}
+      {/* HUD frame */}
+      <div className="hud-corners absolute inset-x-gutter bottom-5 top-24 opacity-60 md:bottom-6 md:top-28" aria-hidden="true">
+        <span className="hud-c" />
+      </div>
+      <div className="absolute right-gutter top-24 flex items-center gap-3 font-body text-[11px] uppercase text-bone/70 hud-mono md:top-28" aria-hidden="true">
+        <span className="hud-ticks h-2 w-16 opacity-60" />
+        <span><span className="text-amber">{pad(index)}</span> / {pad(count - 1)}</span>
       </div>
 
-      {/* Prev / next */}
-      <div className="pointer-events-auto absolute bottom-6 right-gutter flex gap-2 md:bottom-8 lg:bottom-10">
-        <MagneticButton onClick={onPrev} aria-label="Previous slide" className="grid h-12 w-12 place-items-center rounded-full border border-bone/25 text-bone transition-colors duration-fast hover:border-safety hover:text-safety">
-          <Chevron dir="left" />
-        </MagneticButton>
-        <MagneticButton onClick={onNext} aria-label="Next slide" className="grid h-12 w-12 place-items-center rounded-full border border-bone/25 text-bone transition-colors duration-fast hover:border-safety hover:text-safety">
-          <Chevron dir="right" />
-        </MagneticButton>
+      {/* Bottom navigator */}
+      <div className="pointer-events-auto absolute inset-x-gutter bottom-6 flex items-end gap-4 md:bottom-8 lg:bottom-10">
+        <div role="tablist" aria-label="Slides" className="flex w-full gap-2 md:max-w-[58rem] md:gap-3">
+          {slides.map((s, i) => {
+            const active = i === index
+            return (
+              <button
+                key={s.title}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                aria-label={`Slide ${pad(i)}: ${s.title}`}
+                onClick={() => onSelect(i)}
+                data-cursor-grow
+                className={`group relative flex-1 overflow-hidden border text-left backdrop-blur-sm transition-[border-color,background-color] duration-base ${active ? 'border-amber/80 bg-ink/55' : 'border-bone/15 bg-ink/35 hover:border-bone/45'}`}
+              >
+                <span className="absolute inset-x-0 top-0 z-[2] h-0.5 bg-bone/15" aria-hidden="true">
+                  <span
+                    data-progress-bar={i}
+                    className="absolute inset-0 origin-left bg-amber"
+                    style={{ transform: 'scaleX(var(--p, 0))', ['--p' as string]: 0 }}
+                    data-paused={paused ? '' : undefined}
+                  />
+                </span>
+                <span className="hidden aspect-[16/6] overflow-hidden md:block" aria-hidden="true">
+                  <img src={s.image.srcSmall} alt="" width={320} height={120} loading="lazy" decoding="async" className={`h-full w-full object-cover transition-[opacity,transform] duration-slow ease-expo-out ${active ? 'opacity-100 scale-105' : 'opacity-55 group-hover:opacity-90'}`} />
+                </span>
+                <span className="flex items-center gap-3 px-3 py-2.5 md:px-4 md:py-3">
+                  <span className={`font-body text-[11px] hud-mono ${active ? 'text-amber' : 'text-bone/50 group-hover:text-bone'}`}>{pad(i)}</span>
+                  <span className={`hidden truncate font-display text-[1.05rem] uppercase tracking-[0.04em] transition-colors duration-fast md:block ${active ? 'text-bone' : 'text-bone/60 group-hover:text-bone'}`}>{s.title}</span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+        <div className="ml-auto hidden shrink-0 gap-2 md:flex">
+          <MagneticButton onClick={onPrev} aria-label="Previous slide" className="grid h-12 w-12 place-items-center rounded-full border border-bone/25 text-bone transition-colors duration-fast hover:border-amber hover:text-amber">
+            <Chevron dir="left" />
+          </MagneticButton>
+          <MagneticButton onClick={onNext} aria-label="Next slide" className="grid h-12 w-12 place-items-center rounded-full border border-bone/25 text-bone transition-colors duration-fast hover:border-amber hover:text-amber">
+            <Chevron dir="right" />
+          </MagneticButton>
+        </div>
       </div>
     </div>
   )

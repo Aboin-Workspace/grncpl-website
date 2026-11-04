@@ -58,7 +58,7 @@ export const HERO = {
     pointerVelocityScale: 1.1,
     pointerFollow: 0.18,
     exitZoom: 1.15,
-    exitDarken: 0.6,
+    exitDarken: 0.45,
     vignette: 0.38,
     /** Colour grade applied in the shader so the photography reads rich, not flat. */
     grade: { contrast: 1.1, saturation: 1.15, warmth: 0.06, lift: 0.015 },
@@ -97,7 +97,7 @@ export const HERO = {
     friction: 0.985,
   },
 
-  exit: { headlineScale: 0.85, pinPercent: 100, /** The photo dissolves into the 3D pit survey from this exit progress. */ surveyFrom: 0.35, surveyOpacity: 0.85 },
+  exit: { headlineScale: 0.85, pinPercent: 100 },
   /** Pointer parallax on the headline block (px at the viewport edge). */
   pointerParallaxPx: { x: 18, y: 12 },
 

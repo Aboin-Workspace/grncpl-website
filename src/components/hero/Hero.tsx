@@ -14,8 +14,8 @@ import { ParticleField, type ParticleFieldHandle } from './ParticleField'
 import { HeroHeadline, type HeroHeadlineHandle } from './HeroHeadline'
 import { SlideChrome } from './SlideChrome'
 import { ScrollCue } from './ScrollCue'
-import { TerrainMesh } from '@/components/three/TerrainMesh'
-import { useIsDesktop } from '@/hooks/useMediaQuery'
+import { Link } from 'react-router-dom'
+import { HERO_CTAS } from '@/data/home'
 
 interface Props {
   slides: HeroSlide[]
@@ -59,10 +59,6 @@ export function Hero({ slides, subtext, started = true, forceFallback = false }:
   const [manualTick, setManualTick] = useState(0)
   // Pointer parallax (desktop, fine pointer): the headline block drifts a few px against the pointer.
   const fine = usePointerFine()
-  const desktop = useIsDesktop()
-  // Scroll-exit: the photo dissolves into the 3D pit survey (desktop + WebGL only).
-  const survey = useRef<HTMLDivElement>(null)
-  const showSurvey = useCanvas && desktop
   const px = useMotionValue(0)
   const py = useMotionValue(0)
   const sx = useSpring(px, { stiffness: 120, damping: 20, mass: 0.6 })
@@ -193,7 +189,6 @@ export function Hero({ slides, subtext, started = true, forceFallback = false }:
       tl.to(vignette.current, { opacity: 1 }, 0)
       tl.to(chrome.current, { opacity: 0, duration: 0.5 }, 0)
       tl.to('[data-scroll-cue]', { opacity: 0, duration: 0.3 }, 0)
-      if (survey.current) tl.fromTo(survey.current, { opacity: 0 }, { opacity: HERO.exit.surveyOpacity, duration: 1 - HERO.exit.surveyFrom }, HERO.exit.surveyFrom)
       tl.to(paths, { yPercent: (i: number) => lerp(S.parallax.minPercent, S.parallax.maxPercent, paths.length > 1 ? i / (paths.length - 1) : 0) }, 0)
       if (group) tl.to(group, { scaleY: S.converge.scaleY, duration: 1 - S.converge.startAt }, S.converge.startAt)
     },
@@ -244,23 +239,31 @@ export function Hero({ slides, subtext, started = true, forceFallback = false }:
       />
 
       {/* Layer 4 — headline */}
-      <div ref={headlineWrap} className="pointer-events-none absolute inset-x-gutter bottom-[8rem] z-10 md:bottom-[9.5rem] lg:bottom-[9rem] lg:right-[7rem]">
+      <div ref={headlineWrap} className="pointer-events-none absolute inset-x-gutter bottom-[6.5rem] z-10 md:bottom-[11.5rem] lg:right-[16rem] lg:bottom-[12.5rem]">
         <m.div style={{ x: sx, y: sy }}>
           <HeroHeadline ref={headline} slides={slides} index={index} subtext={subtext} started={started} reduced={reduced} />
+          {/* CTAs: existing nav destinations, revealed after the headline settles */}
+          <m.div
+            className="pointer-events-auto mt-6 flex flex-wrap gap-3 md:mt-8"
+            initial={reduced ? false : { opacity: 0, y: 16 }}
+            animate={started ? { opacity: 1, y: 0 } : undefined}
+            transition={{ duration: 0.7, delay: reduced ? 0 : 1.1, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <Link to={HERO_CTAS.primary.href} className="btn-sweep inline-flex items-center gap-3 bg-amber px-6 py-3.5 font-body text-[12px] font-bold uppercase tracking-[0.18em] text-ink" data-cursor-grow>
+              {HERO_CTAS.primary.label}<span className="btn-arrow" aria-hidden="true">→</span>
+            </Link>
+            <Link to={HERO_CTAS.secondary.href} className="inline-flex items-center gap-3 border border-bone/30 px-6 py-3.5 font-body text-[12px] font-bold uppercase tracking-[0.18em] text-bone backdrop-blur-sm transition-colors duration-fast hover:border-amber hover:text-amber" data-cursor-grow>
+              {HERO_CTAS.secondary.label}
+            </Link>
+          </m.div>
         </m.div>
       </div>
 
       {/* Exit darkening (also covers the fallback) */}
       <div ref={vignette} className="pointer-events-none absolute inset-0 z-[15] bg-ink/80 opacity-0" aria-hidden="true" />
-      {/* Survey layer: the open-pit wireframe rises out of the photo as the hero scrolls away */}
-      {showSurvey && (
-        <div ref={survey} className="pointer-events-none absolute inset-0 z-[16] opacity-0" aria-hidden="true">
-          <TerrainMesh progressRef={exitState} pointerTarget={root} intensity={0.9} scale={1.35} offsetY={-0.15} />
-        </div>
-      )}
 
       {/* Layer 5 — chrome */}
-      <SlideChrome ref={chrome} count={n} index={index} paused={paused || focused || offscreen} onSelect={goTo} onPrev={prev} onNext={() => next()} />
+      <SlideChrome ref={chrome} slides={slides} index={index} paused={paused || focused || offscreen} onSelect={goTo} onPrev={prev} onNext={() => next()} />
       {!reduced && <ScrollCue />}
 
       <div className="sr-only" aria-live={paused ? 'polite' : 'off'} aria-atomic="true">

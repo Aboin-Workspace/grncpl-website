@@ -26,6 +26,9 @@ export const HERO_SLIDES: HeroSlide[] = [
   { title: 'MAKING A DIFFERENCE', accent: 'DIFFERENCE', image: { src: '/images/hero/slide-4-1920.webp', srcSmall: '/images/hero/slide-4-1080.webp', srcLarge: '/images/hero/slide-4-3840.webp', alt: 'Komatsu dumpers being loaded by an excavator at the pit edge' } },
 ]
 
+/** Hero buttons reuse existing destinations and labels from the navigation. */
+export const HERO_CTAS = { primary: { label: 'Equipments', href: '/equipments/' }, secondary: { label: 'Contact Us', href: '/contact-us/' } } as const
+
 export const HERO_SUBTEXT =
   'We go the extra mile to ensure our clients are thoroughly satisfied. We measure our success with quality and perfection we deliver on works.'
 
