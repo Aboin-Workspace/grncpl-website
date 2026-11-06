@@ -179,7 +179,7 @@ export function Hero({ slides, subtext, started = true, forceFallback = false }:
           start: 'top top',
           end: `+=${HERO.exit.pinPercent}%`,
           pin: true,
-          scrub: true,
+          scrub: HERO.exit.scrub,
           anticipatePin: 1,
           invalidateOnRefresh: true,
         },

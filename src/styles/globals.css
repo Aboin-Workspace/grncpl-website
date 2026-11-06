@@ -265,3 +265,11 @@ html[data-theme='light'] .earth-wash {
   opacity: 1;
   background: radial-gradient(55% 48% at 56% 46%, rgba(158, 110, 58, 0.22) 0%, rgba(158, 110, 58, 0.08) 45%, rgba(158, 110, 58, 0) 70%);
 }
+
+/* ---------- Hero thumbnail: slow drift while the slide is live ---------- */
+@keyframes thumb-live { from { transform: scale(1.02) translateX(0); } to { transform: scale(1.12) translateX(-2%); } }
+.thumb-live { animation: thumb-live 6s ease-in-out infinite alternate; }
+@media (prefers-reduced-motion: reduce) { .thumb-live { animation: none; } }
+html[data-reduced-motion='1'] .thumb-live { animation: none; }
+/* Headline legibility over bright skies */
+.text-hero { text-shadow: 0 2px 28px rgba(0, 0, 0, 0.35); }

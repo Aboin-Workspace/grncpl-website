@@ -1,5 +1,7 @@
 import { forwardRef } from 'react'
+import { AnimatePresence, m } from 'motion/react'
 import { MagneticButton } from '@/components/motion/MagneticButton'
+import { useReducedMotion } from '@/hooks/useReducedMotion'
 import type { HeroSlide } from '@/data/home'
 
 interface Props {
@@ -27,6 +29,7 @@ const Chevron = ({ dir }: { dir: 'left' | 'right' }) => (
  */
 export const SlideChrome = forwardRef<HTMLDivElement, Props>(function SlideChrome({ slides, index, paused, onSelect, onPrev, onNext }, ref) {
   const count = slides.length
+  const reduced = useReducedMotion()
   return (
     <div ref={ref} className="pointer-events-none absolute inset-0 z-20">
       {/* HUD frame */}
@@ -35,7 +38,23 @@ export const SlideChrome = forwardRef<HTMLDivElement, Props>(function SlideChrom
       </div>
       <div className="absolute right-gutter top-24 flex items-center gap-3 font-body text-[11px] uppercase text-bone/70 hud-mono md:top-28" aria-hidden="true">
         <span className="hud-ticks h-2 w-16 opacity-60" />
-        <span><span className="text-amber">{pad(index)}</span> / {pad(count - 1)}</span>
+        <span className="flex items-center gap-1">
+          <span className="relative inline-block h-[1.2em] w-[1.6em] overflow-hidden text-amber">
+            <AnimatePresence initial={false}>
+              <m.span
+                key={index}
+                className="absolute inset-0"
+                initial={reduced ? { opacity: 0 } : { y: '100%', opacity: 0 }}
+                animate={{ y: '0%', opacity: 1 }}
+                exit={reduced ? { opacity: 0 } : { y: '-100%', opacity: 0 }}
+                transition={{ duration: reduced ? 0.15 : 0.5, ease: [0.16, 1, 0.3, 1] }}
+              >
+                {pad(index)}
+              </m.span>
+            </AnimatePresence>
+          </span>
+          <span>/ {pad(count - 1)}</span>
+        </span>
       </div>
 
       {/* Bottom navigator */}
@@ -44,13 +63,16 @@ export const SlideChrome = forwardRef<HTMLDivElement, Props>(function SlideChrom
           {slides.map((s, i) => {
             const active = i === index
             return (
-              <button
+              <m.button
                 key={s.title}
                 type="button"
                 role="tab"
                 aria-selected={active}
                 aria-label={`Slide ${pad(i)}: ${s.title}`}
                 onClick={() => onSelect(i)}
+                whileHover={reduced || active ? undefined : { y: -4 }}
+                whileTap={reduced ? undefined : { scale: 0.98 }}
+                transition={{ type: 'spring', stiffness: 380, damping: 28 }}
                 data-cursor-grow
                 className={`group relative flex-1 overflow-hidden border text-left backdrop-blur-sm transition-[border-color,background-color] duration-base ${active ? 'border-amber/80 bg-ink/55' : 'border-bone/15 bg-ink/35 hover:border-bone/45'}`}
               >
@@ -63,13 +85,13 @@ export const SlideChrome = forwardRef<HTMLDivElement, Props>(function SlideChrom
                   />
                 </span>
                 <span className="hidden aspect-[16/6] overflow-hidden md:block" aria-hidden="true">
-                  <img src={s.image.srcSmall} alt="" width={320} height={120} loading="lazy" decoding="async" className={`h-full w-full object-cover transition-[opacity,transform] duration-slow ease-expo-out ${active ? 'opacity-100 scale-105' : 'opacity-55 group-hover:opacity-90'}`} />
+                  <img src={s.image.srcSmall} alt="" width={320} height={120} loading="lazy" decoding="async" className={`h-full w-full object-cover transition-opacity duration-slow ease-expo-out ${active ? 'thumb-live opacity-100' : 'opacity-55 group-hover:opacity-90'}`} />
                 </span>
                 <span className="flex items-center gap-3 px-3 py-2.5 md:px-4 md:py-3">
                   <span className={`font-body text-[11px] hud-mono ${active ? 'text-amber' : 'text-bone/50 group-hover:text-bone'}`}>{pad(i)}</span>
                   <span className={`hidden truncate font-display text-[1.05rem] uppercase tracking-[0.04em] transition-colors duration-fast md:block ${active ? 'text-bone' : 'text-bone/60 group-hover:text-bone'}`}>{s.title}</span>
                 </span>
-              </button>
+              </m.button>
             )
           })}
         </div>

@@ -7,7 +7,8 @@ let tickerFn: ((t: number) => void) | null = null
 /** Creates the singleton Lenis instance and syncs it with ScrollTrigger. */
 export function createLenis(): Lenis {
   if (lenis) return lenis
-  lenis = new Lenis({ lerp: 0.1, wheelMultiplier: 1, smoothWheel: true })
+  // Slightly lower lerp = longer, silkier glide; touch stays native for responsiveness.
+  lenis = new Lenis({ lerp: 0.085, wheelMultiplier: 1, smoothWheel: true, syncTouch: false })
   lenis.on('scroll', ScrollTrigger.update)
   tickerFn = (t) => lenis?.raf(t * 1000)
   gsap.ticker.add(tickerFn)

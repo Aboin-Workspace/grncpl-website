@@ -18,7 +18,7 @@ export const DURATION = {
   base: 0.6,
   slow: 1.1,
   wipe: 0.7,
-  liquid: 1.4,
+  liquid: 1.6,
   /** All motion collapses to this when prefers-reduced-motion is set. */
   reducedFade: 0.2,
 } as const
@@ -97,7 +97,7 @@ export const HERO = {
     friction: 0.985,
   },
 
-  exit: { headlineScale: 0.85, pinPercent: 100 },
+  exit: { headlineScale: 0.85, pinPercent: 100, /** Scrub smoothing (s) so the exit glides instead of tracking the wheel 1:1. */ scrub: 0.6 },
   /** Pointer parallax on the headline block (px at the viewport edge). */
   pointerParallaxPx: { x: 18, y: 12 },
 

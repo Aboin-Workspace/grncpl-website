@@ -28,7 +28,7 @@ export function EditorialPage({ eyebrow, title, headline, banner, paragraphs, pu
       <Section className="pt-40 md:pt-48">
         <Eyebrow>{eyebrow}</Eyebrow>
         <SplitText as="h1" text={title} immediate className="mt-4 font-display text-display-xl uppercase text-bone" />
-        {banner && <ParallaxImage src={banner.src} alt={banner.alt} priority className="mt-12 md:mt-16" frameClassName="aspect-[4/3] md:aspect-[21/9]" />}
+        {banner && <ParallaxImage src={banner.src} alt={banner.alt} priority clipReveal className="mt-12 md:mt-16" frameClassName="aspect-[4/3] md:aspect-[21/9]" />}
       </Section>
 
       <StrataDivider amber className="bg-ink" />
