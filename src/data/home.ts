@@ -20,10 +20,10 @@ export interface HeroSlide {
  * re-encoded as WebP at 1920w / 1080w. TODO(client): supply 4K masters if they exist.
  */
 export const HERO_SLIDES: HeroSlide[] = [
-  { title: 'ACHIEVING THE IMPOSSIBLE', accent: 'IMPOSSIBLE', image: { src: '/images/hero/slide-1-1920.webp', srcSmall: '/images/hero/slide-1-1080.webp', srcLarge: '/images/hero/slide-1-3840.webp', alt: 'Open-cast mine with terraced benches, haul roads and dumpers under a dust haze' } },
-  { title: 'BLASTING FREE EXCAVATION', accent: 'EXCAVATION', image: { src: '/images/hero/slide-2-1920.webp', srcSmall: '/images/hero/slide-2-1080.webp', srcLarge: '/images/hero/slide-2-3840.webp', alt: 'Volvo excavator loading a dumper truck at a rock face' } },
-  { title: 'EXPLORING OPPORTUNITIES', accent: 'OPPORTUNITIES', image: { src: '/images/hero/slide-3-1920.webp', srcSmall: '/images/hero/slide-3-1080.webp', srcLarge: '/images/hero/slide-3-3840.webp', alt: 'Red iron-ore mine with excavators, dumpers and a loader working the benches' } },
-  { title: 'MAKING A DIFFERENCE', accent: 'DIFFERENCE', image: { src: '/images/hero/slide-4-1920.webp', srcSmall: '/images/hero/slide-4-1080.webp', srcLarge: '/images/hero/slide-4-3840.webp', alt: 'Komatsu dumpers being loaded by an excavator at the pit edge' } },
+  { title: 'ACHIEVING THE IMPOSSIBLE', accent: 'IMPOSSIBLE', image: { src: '/images/hero/slide-1-1920.webp', srcSmall: '/images/hero/slide-1-1080.webp', srcLarge: '/images/hero/slide-1-3840.webp', alt: 'Aerial view of a vast terraced open-pit mine, a line of dumpers climbing the spiral haul road through morning haze' } },
+  { title: 'BLASTING FREE EXCAVATION', accent: 'EXCAVATION', image: { src: '/images/hero/slide-2-1920.webp', srcSmall: '/images/hero/slide-2-1080.webp', srcLarge: '/images/hero/slide-2-3840.webp', alt: 'Hydraulic excavator loading a rigid dump truck at the rock face, dust lit from behind' } },
+  { title: 'EXPLORING OPPORTUNITIES', accent: 'OPPORTUNITIES', image: { src: '/images/hero/slide-3-1920.webp', srcSmall: '/images/hero/slide-3-1080.webp', srcLarge: '/images/hero/slide-3-3840.webp', alt: 'Red iron-ore bench with a wheel loader filling a dumper in late afternoon light' } },
+  { title: 'MAKING A DIFFERENCE', accent: 'DIFFERENCE', image: { src: '/images/hero/slide-4-1920.webp', srcSmall: '/images/hero/slide-4-1080.webp', srcLarge: '/images/hero/slide-4-3840.webp', alt: 'Convoy of dumpers on a haul road winding along the pit benches' } },
 ]
 
 /** Hero buttons reuse existing destinations and labels from the navigation. */
