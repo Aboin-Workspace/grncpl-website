@@ -273,3 +273,7 @@ html[data-theme='light'] .earth-wash {
 html[data-reduced-motion='1'] .thumb-live { animation: none; }
 /* Headline legibility over bright skies */
 .text-hero { text-shadow: 0 2px 28px rgba(0, 0, 0, 0.35); }
+
+/* ---------- Project map: current-project pulse ---------- */
+@keyframes map-pulse { 0% { r: 4; opacity: 0.9; } 100% { r: 14; opacity: 0; } }
+.map-pulse { animation: map-pulse 2.2s var(--ease-power2-out) infinite; }

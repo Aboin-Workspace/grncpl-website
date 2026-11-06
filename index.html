@@ -14,5 +14,9 @@
   <body class="bg-ink text-bone font-body antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+      <!-- Static copy of the contact form so Netlify registers it at build time (the live form is React). -->
+    <form name="contact" netlify netlify-honeypot="company" hidden>
+      <input type="text" name="name" /><input type="email" name="email" /><input type="tel" name="phone" /><textarea name="message"></textarea><input name="company" />
+    </form>
   </body>
 </html>

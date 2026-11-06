@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { COMPLETED_PROJECTS, COMPLETED_PROJECTS_COLUMNS as COL, COMPLETED_PROJECTS_TITLE, PROJECT_FILTERS, PRODUCTION, PRODUCTION_GRAND_TOTAL, PRODUCTION_SERIES, PRODUCTION_TITLE, type Client, type CompletedProject } from '@/data/projects'
+import { COMPLETED_PROJECTS, COMPLETED_PROJECTS_COLUMNS as COL, COMPLETED_PROJECTS_TITLE, PROJECT_FILTERS, PRODUCTION, PRODUCTION_GRAND_TOTAL, PRODUCTION_SERIES, PRODUCTION_TITLE, STATE_NAMES, type Client, type CompletedProject, type StateId } from '@/data/projects'
+import { ProjectMap } from '@/components/works/ProjectMap'
 import { Seo } from '@/components/ui/Seo'
 import { Section, Eyebrow } from '@/components/layout/Section'
 import { SplitText } from '@/components/motion/SplitText'
@@ -17,7 +18,8 @@ const toDate = (d: string) => {
 
 export default function CompletedProjects() {
   const [filter, setFilter] = useState<Client | 'All'>('All')
-  const rows = useMemo(() => (filter === 'All' ? COMPLETED_PROJECTS : COMPLETED_PROJECTS.filter((r) => r.client === filter)), [filter])
+  const [state, setState] = useState<StateId | 'All'>('All')
+  const rows = useMemo(() => COMPLETED_PROJECTS.filter((r) => (filter === 'All' || r.client === filter) && (state === 'All' || r.state === state)), [filter, state])
   const reduced = useReducedMotion()
   const chartRef = useRef<HTMLDivElement>(null)
   const [chartIn, setChartIn] = useState(false)
@@ -48,7 +50,10 @@ export default function CompletedProjects() {
       <Section className="pt-40 md:pt-48">
         <Eyebrow>Works</Eyebrow>
         <SplitText as="h1" text={COMPLETED_PROJECTS_TITLE} immediate className="mt-4 font-display text-display-xl uppercase text-bone" />
-        <Reveal className="mt-10 flex flex-wrap gap-2" aria-label="Filter by client">
+        <Reveal className="mt-12 md:mt-16">
+          <ProjectMap active={state} onChange={setState} />
+        </Reveal>
+        <Reveal className="mt-14 flex flex-wrap items-center gap-2" aria-label="Filter by client">
           {PROJECT_FILTERS.map((f) => (
             <button
               key={f.value}
@@ -60,6 +65,11 @@ export default function CompletedProjects() {
               {f.label}
             </button>
           ))}
+          {state !== 'All' && (
+            <button type="button" onClick={() => setState('All')} className="ml-2 border border-amber/60 px-3 py-2 font-body text-[12px] uppercase tracking-[0.14em] text-amber hover:bg-amber hover:text-ink">
+              {STATE_NAMES[state]} ×<span className="sr-only"> clear state filter</span>
+            </button>
+          )}
         </Reveal>
         <div className="mt-8">
           <DataTable columns={columns} rows={rows} rowKey={(r) => r.sno} caption={COMPLETED_PROJECTS_TITLE} titleKey="name" comparators={comparators} />

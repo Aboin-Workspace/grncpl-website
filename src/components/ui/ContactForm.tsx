@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { AnimatePresence, m } from 'motion/react'
-import { CONTACT } from '@/data/contact'
+import { CONTACT, OFFICES } from '@/data/contact'
 import { MagneticButton } from '@/components/motion/MagneticButton'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
 
@@ -21,13 +21,21 @@ export function ContactForm() {
   const F = CONTACT.form
   const reduced = useReducedMotion()
   const [sent, setSent] = useState(false)
+  const [failed, setFailed] = useState(false)
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Values>({ resolver: zodResolver(schema), mode: 'onBlur' })
 
+  // Netlify Forms: the static copy of this form in index.html registers it at build time;
+  // submissions POST url-encoded to the site root and show up under Forms → "contact" in Netlify.
   const onSubmit = async (values: Values) => {
-    void values
-    // TODO(client): wire to the real form endpoint (email service / CRM). Currently simulates a send.
-    await new Promise((r) => setTimeout(r, 700))
-    setSent(true)
+    setFailed(false)
+    const body = new URLSearchParams({ 'form-name': 'contact', ...values }).toString()
+    try {
+      const res = await fetch('/', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body })
+      if (!res.ok) throw new Error(String(res.status))
+      setSent(true)
+    } catch {
+      setFailed(true)
+    }
   }
 
   return (
@@ -43,7 +51,9 @@ export function ContactForm() {
             <p className="mt-2 font-body text-bone/75">{F.success.body}</p>
           </m.div>
         ) : (
-          <m.form key="form" exit={{ opacity: 0 }} onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-6">
+          <m.form key="form" name="contact" method="POST" data-netlify="true" netlify-honeypot="company" exit={{ opacity: 0 }} onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-6">
+            <input type="hidden" name="form-name" value="contact" />
+            <p className="hidden" aria-hidden="true"><label>Company <input name="company" tabIndex={-1} autoComplete="off" /></label></p>
             {(['name', 'email', 'phone'] as const).map((k) => (
               <div key={k}>
                 <label htmlFor={`cf-${k}`} className="font-body text-eyebrow uppercase text-bone/60">{F.fields[k]}</label>
@@ -67,6 +77,11 @@ export function ContactForm() {
             <MagneticButton type="submit" disabled={isSubmitting} className="btn-sweep bg-amber px-8 py-4 font-body text-sm font-bold uppercase tracking-[0.18em] text-ink disabled:opacity-60">
               {isSubmitting ? 'Sending…' : F.submit}
             </MagneticButton>
+            {failed && (
+              <p role="alert" className="font-body text-sm text-safety">
+                {F.error} <a href={`mailto:${OFFICES[0].email}`} className="underline">{OFFICES[0].email}</a>
+              </p>
+            )}
           </m.form>
         )}
       </AnimatePresence>

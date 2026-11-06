@@ -98,6 +98,10 @@ src/
 - Client badges on the home strip (`CLIENT_BADGES` in `src/data/home.ts`) draw a monogram until a `logo` file is supplied.
 - The Equipments page uses `src/components/fleet/*` (HUD frame with corner brackets and scan line, vertical fleet selector). Timing in `FLEET`.
 
+## Project map
+
+Completed Projects shows an India map (`src/components/works/ProjectMap.tsx`) built on the `@svg-maps/india` paths (CC BY 4.0, credited in the UI). Each project row carries a `state` id in `src/data/projects.ts`, derived from the mine area named in the work and marked `TODO(client)` to confirm. Clicking a state or its list entry filters the table.
+
 ## Images
 
 All bitmaps in `public/images` are re-mastered from the grncpl.com originals with `scripts`-style sharp processing (Lanczos3 upscale, light clarity, WebP). The hero ships 1080 / 1920 / 3840 variants picked by `pickHeroSrc()` in `src/lib/webgl.ts`. The 3840 files are upscales of the 1920 originals, not true 4K: swap in the client's masters at the same paths when available (`TODO(client)`).

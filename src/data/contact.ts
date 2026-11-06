@@ -38,6 +38,7 @@ export const CONTACT = {
     fields: { name: 'Name', email: 'Email', phone: 'Phone', message: 'Message' },
     submit: 'Send message',
     success: { title: 'Message sent', body: 'Thank you. We will get back to you shortly.' },
+    error: 'The message could not be sent. Please email us directly at',
   },
   // TODO(client): the old page had a map block that did not come through; supply the embed URL.
   mapEmbedUrl: null as string | null,
