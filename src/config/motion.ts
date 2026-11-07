@@ -223,6 +223,40 @@ export const TERRAIN = {
   reveal: 1.6,
 } as const
 
+/**
+ * Scroll-driven 3D hero (src/components/hero/WorldHero.tsx). The camera flies from an
+ * aerial view down the spiral haul road to the pit floor over `pinPercent` of scroll.
+ */
+export const WORLD = {
+  grid: 240,
+  /** Bench batter as a fraction of bench width (wider than the wireframe's so flat shading reads as a slope, not a saw). */
+  ramp: 0.55,
+  /** Half-extent of the terrain in mesh units (the pit radius is 0.82). */
+  extent: 2.4,
+  dprCap: 1.5,
+  /** Extra scroll while pinned: 4 stages across this distance. */
+  pinPercent: 320,
+  scrub: 0.9,
+  camera: { fov: 46, near: 0.02, far: 12, roadLift: 0.09 },
+  /** Lighting + atmosphere (linear RGB 0..1). */
+  sun: [0.45, 0.75, 0.35] as [number, number, number],
+  sky: { top: [0.52, 0.60, 0.66], horizon: [0.86, 0.82, 0.74], haze: 0.9 },
+  fog: { color: [0.80, 0.76, 0.68] as [number, number, number], density: 0.22 },
+  /** Surface relief: gentle rolling ground outside the rim, nearly flat benches inside. */
+  relief: { amplitude: 0.05, frequency: 1.6, inner: 0.05 },
+  earth: {
+    surface: [0.60, 0.46, 0.29] as [number, number, number],
+    bench: [0.72, 0.58, 0.38] as [number, number, number],
+    rock: [0.30, 0.33, 0.36] as [number, number, number],
+    deep: [0.24, 0.22, 0.20] as [number, number, number],
+    road: [0.46, 0.41, 0.35] as [number, number, number],
+  },
+  trucks: { count: 7, speed: 0.11, paint: [0.93, 0.70, 0.12] as [number, number, number], scale: 0.5 },
+  pointer: { yaw: 0.14, pitch: 0.07, lerp: 0.05 },
+  /** Dust motes in the air (GL points). */
+  dust: { count: 900, size: 2.2, alpha: 0.35 },
+} as const
+
 export const FLEET = {
   panel: { duration: 0.55, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] },
   rowStagger: 0.06,

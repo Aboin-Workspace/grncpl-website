@@ -1,4 +1,8 @@
 import { Hero } from '@/components/hero/Hero'
+import { WorldHero } from '@/components/hero/WorldHero'
+import { hasWebGL } from '@/lib/webgl'
+import { useIsDesktop } from '@/hooks/useMediaQuery'
+import { useReducedMotion } from '@/hooks/useReducedMotion'
 import { Seo } from '@/components/ui/Seo'
 import { HERO_SLIDES, HERO_SUBTEXT } from '@/data/home'
 import { useAppState } from '@/lib/appState'
@@ -15,10 +19,14 @@ import { Defer } from '@/components/motion/Defer'
 
 export default function Home() {
   const { started } = useAppState()
+  // The scroll-driven 3D world needs a desktop viewport and WebGL; everything else gets the photo hero.
+  const desktop = useIsDesktop()
+  const reduced = useReducedMotion()
+  const world = desktop && !reduced && hasWebGL()
   return (
     <>
       <Seo path="/" localBusiness />
-      <Hero slides={HERO_SLIDES} subtext={HERO_SUBTEXT} started={started} />
+      {world ? <WorldHero slides={HERO_SLIDES} subtext={HERO_SUBTEXT} started={started} /> : <Hero slides={HERO_SLIDES} subtext={HERO_SUBTEXT} started={started} />}
       <div className="relative z-10">
         <Pillars />
         <Defer>

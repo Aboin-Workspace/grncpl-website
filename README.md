@@ -94,7 +94,7 @@ src/
 
 - `src/components/three/TerrainMesh.tsx` is a procedural open-pit survey in OGL (benches, a spiral haul road, rolling overburden, an amber survey ring). Everything is computed in `src/lib/shaders/terrain.vert.glsl`; there are no models or textures. Used on the Equipments hero and behind the home stats band. Props: `progressRef` (scroll 0..1 lifts the camera), `pointerTarget`, `intensity`, `scale`, `offsetY`. Tunables live in `TERRAIN` in `src/config/motion.ts`. Renders one frame under reduced motion and pauses off-screen.
 - `src/components/csr/ResponsibilityPyramid.tsx` and `src/components/company/KeyValuesWheel.tsx` replace the old stock bitmaps (CSR.jpg, values.png). Their text lives verbatim in `src/data/csr.ts` (`CSR_PYRAMID`) and `src/data/company.ts` (`ABOUT_US.keyValues`). Both auto-cycle until the visitor hovers, taps or focuses a tier.
-- The hero photos carry a pseudo-depth pointer parallax (`HERO.webgl.depthParallax`).
+- Home hero on desktop with WebGL is `src/components/hero/WorldHero.tsx`: a scroll-driven low-poly open-pit world (polar-grid terrain, spiral haul road, dumpers, dust, sky) that the camera flies down through four headline stages while the section is pinned. Everything procedural, no models. Tunables in `WORLD`; the camera path is the `posKeys`/`lookKeys` splines in the component. Phones, reduced motion and no-WebGL get the photo hero (`Hero.tsx`), whose photos carry a pseudo-depth pointer parallax (`HERO.webgl.depthParallax`).
 - Client badges on the home strip (`CLIENT_BADGES` in `src/data/home.ts`) draw a monogram until a `logo` file is supplied.
 - The Equipments page uses `src/components/fleet/*` (HUD frame with corner brackets and scan line, vertical fleet selector). Timing in `FLEET`.
 

@@ -6,7 +6,8 @@ import { getLenis } from '@/lib/lenis'
 export function BackToTop() {
   const { scrollY } = useScroll()
   const [show, setShow] = useState(false)
-  useMotionValueEvent(scrollY, 'change', (y) => setShow(y > window.innerHeight))
+  // Appear once the first pinned section (hero) is behind us, not merely one viewport down.
+  useMotionValueEvent(scrollY, 'change', (y) => setShow(y > window.innerHeight * 4.5))
   const toTop = () => {
     const lenis = getLenis()
     if (lenis) lenis.scrollTo(0, { duration: 1.2 })
