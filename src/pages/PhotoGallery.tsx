@@ -1,4 +1,6 @@
 import { GALLERY as G } from '@/data/contact'
+import { SITE_PHOTOS } from '@/data/home'
+import { PhotoCarousel } from '@/components/ui/PhotoCarousel'
 import { Seo } from '@/components/ui/Seo'
 import { ComingSoon } from '@/components/ui/ComingSoon'
 import { Section, Eyebrow } from '@/components/layout/Section'
@@ -9,7 +11,16 @@ export default function PhotoGallery() {
   return (
     <>
       <Seo path="/photo-gallery/" />
-      <ComingSoon eyebrow="Gallery" title={G.title} label={G.comingSoon}>
+      <Section className="pt-40 md:pt-48" aria-labelledby="gallery-heading">
+        <Eyebrow>Gallery</Eyebrow>
+        <SplitText as="h1" text={G.title} immediate className="mt-4 font-display text-display-xl uppercase text-bone" />
+        <span id="gallery-heading" className="sr-only">{G.title}</span>
+        <Reveal className="mt-12 md:mt-16">
+          {/* Site imagery (currently AI-generated atmosphere pictures). TODO(client): replace with real site photography. */}
+          <PhotoCarousel photos={SITE_PHOTOS} label="Site photographs" />
+        </Reveal>
+      </Section>
+      <ComingSoon eyebrow="More photos" title={G.comingSoon} label={G.comingSoon} as="h2" minHeight="min-h-[50svh]">
         <Section tone="coal" aria-labelledby="award-heading">
           <div className="grid gap-10 lg:grid-cols-12">
             <div className="lg:col-span-6">

@@ -27,6 +27,9 @@ export const HERO_SLIDES: HeroSlide[] = [
 ]
 
 /** Hero buttons reuse existing destinations and labels from the navigation. */
+/** The four site photographs as gallery entries. The desktop home hero draws a live 3D world instead; phones still use these as slides. */
+export const SITE_PHOTOS = HERO_SLIDES.map((s) => ({ src: s.image.src, srcSmall: s.image.srcSmall, alt: s.image.alt, caption: s.image.alt }))
+
 export const HERO_CTAS = { primary: { label: 'Equipments', href: '/equipments/' }, secondary: { label: 'Contact Us', href: '/contact-us/' } } as const
 
 export const HERO_SUBTEXT =

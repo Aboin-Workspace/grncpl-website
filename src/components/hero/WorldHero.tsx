@@ -11,7 +11,7 @@ import { useReducedMotion } from '@/hooks/useReducedMotion'
 import type { HeroSlide } from '@/data/home'
 import { HERO_CTAS } from '@/data/home'
 import { HeroHeadline, type HeroHeadlineHandle } from './HeroHeadline'
-import { SlideChrome } from './SlideChrome'
+import { StageRail } from './StageRail'
 import { ScrollCue } from './ScrollCue'
 import { ParticleField, type ParticleFieldHandle } from './ParticleField'
 import worldVert from '@/lib/shaders/world.vert.glsl?raw'
@@ -492,7 +492,7 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[5] h-[34vh] min-h-[180px] bg-scrim-top" aria-hidden="true" />
       {!reduced && dustReady && <ParticleField ref={particles} pointerTarget={root} />}
 
-      <div ref={headlineWrap} className="pointer-events-none absolute inset-x-gutter bottom-[6.5rem] z-10 md:bottom-[11.5rem] lg:right-[16rem] lg:bottom-[12.5rem]">
+      <div ref={headlineWrap} className="pointer-events-none absolute inset-x-gutter bottom-[6.5rem] z-10 md:bottom-[8.5rem] lg:right-[16rem] lg:bottom-[9rem]">
         <HeroHeadline ref={headline} slides={slides} index={index} subtext={subtext} started={started} reduced={reduced} />
         <m.div
           className="pointer-events-auto mt-6 flex flex-wrap gap-3 md:mt-8"
@@ -510,7 +510,7 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
       </div>
 
       <m.div className="absolute inset-0 z-20" initial={false} animate={{ opacity: started ? 1 : 0 }} transition={{ duration: reduced ? 0 : 1.2, delay: started && !reduced ? 1.6 : 0, ease: [0.16, 1, 0.3, 1] }} style={{ pointerEvents: started ? undefined : 'none' }}>
-        <SlideChrome ref={chrome} slides={slides} index={index} paused={false} onSelect={scrollToStage} onPrev={() => scrollToStage(Math.max(0, index - 1))} onNext={() => scrollToStage(Math.min(n - 1, index + 1))} />
+        <StageRail ref={chrome} slides={slides} index={index} onSelect={scrollToStage} onPrev={() => scrollToStage(Math.max(0, index - 1))} onNext={() => scrollToStage(Math.min(n - 1, index + 1))} />
         {!reduced && <ScrollCue />}
       </m.div>
       <div className="sr-only" aria-live="polite" aria-atomic="true">Stage {index + 1} of {n}: {slides[index].title}</div>
