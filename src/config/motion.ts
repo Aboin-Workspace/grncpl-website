@@ -241,7 +241,7 @@ export const WORLD = {
   /** Lighting + atmosphere (linear RGB 0..1). */
   sun: [0.45, 0.75, 0.35] as [number, number, number],
   sky: { top: [0.52, 0.60, 0.66], horizon: [0.86, 0.82, 0.74], haze: 0.9 },
-  fog: { color: [0.80, 0.76, 0.68] as [number, number, number], density: 0.22 },
+  fog: { color: [0.80, 0.76, 0.68] as [number, number, number], density: 0.09 },
   /** Surface relief: gentle rolling ground outside the rim, nearly flat benches inside. */
   relief: { amplitude: 0.05, frequency: 1.6, inner: 0.05 },
   earth: {
@@ -252,8 +252,12 @@ export const WORLD = {
     road: [0.46, 0.41, 0.35] as [number, number, number],
   },
   trucks: { count: 7, speed: 0.11, paint: [0.93, 0.70, 0.12] as [number, number, number], scale: 0.6, trailPuffs: 14, trailAlpha: 0.22, /** Radial lane offset (mesh units) so opposing trucks pass each other. */ laneOffset: 0.02 },
+  excavators: { count: 4, scale: 0.32, cycleSeconds: 7, paint: [0.93, 0.70, 0.12] as [number, number, number] },
+  drills: { count: 2, scale: 0.42, paint: [0.86, 0.86, 0.84] as [number, number, number] },
+  /** Pulsing beacons on machines (brand green). */
+  beacon: [0.55, 0.78, 0.25] as [number, number, number],
   /** Intro fly-in when the preloader lifts: from a high, distant vantage into the aerial stage. */
-  intro: { from: [0.9, 3.2, 4.2] as [number, number, number], duration: 3.2 },
+  intro: { from: [0.7, 2.4, 3.1] as [number, number, number], duration: 3.2 },
   /** Fraction of a stage the scroll must pass a boundary by before the headline changes. */
   stageHysteresis: 0.08,
   pointer: { yaw: 0.14, pitch: 0.07, lerp: 0.05 },

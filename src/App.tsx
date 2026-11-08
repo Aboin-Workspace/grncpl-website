@@ -10,6 +10,9 @@ import { Grain } from '@/components/motion/Grain'
 import { Cursor } from '@/components/motion/Cursor'
 import { PageTransition } from '@/components/motion/PageTransition'
 import { Preloader } from '@/components/motion/Preloader'
+import { hasWebGL } from '@/lib/webgl'
+import { useIsDesktop } from '@/hooks/useMediaQuery'
+import { useReducedMotion } from '@/hooks/useReducedMotion'
 import { RouteLoader } from '@/components/motion/RouteLoader'
 import { BackToTop } from '@/components/motion/BackToTop'
 import { shouldPreload } from '@/lib/preload'
@@ -24,15 +27,20 @@ function Site() {
   const [started, setStarted] = useState(() => !shouldPreload())
   // The preloader stays mounted through its curtain; `started` flips as the curtain begins to open.
   const [preloading, setPreloading] = useState(() => shouldPreload())
+  const desktop = useIsDesktop()
+  const reduced = useReducedMotion()
+  // Home on desktop: the loader is a HUD over the live 3D world instead of an opaque curtain.
+  const hudLoader = location.pathname === '/' && desktop && !reduced && hasWebGL()
   return (
     <AppStateContext.Provider value={{ started }}>
-      {preloading && <Preloader pathname={location.pathname} onReveal={() => setStarted(true)} onDone={() => { setStarted(true); setPreloading(false) }} />}
+      {preloading && <Preloader pathname={location.pathname} variant={hudLoader ? 'hud' : 'curtain'} onReveal={() => setStarted(true)} onDone={() => { setStarted(true); setPreloading(false) }} />}
       <Grain />
       <Cursor />
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:bg-amber focus:px-4 focus:py-2 focus:text-ink">
         Skip to content
       </a>
-      <Header />
+      {/* Hidden while the HUD loader runs so the game-style intro owns the screen. */}
+      <div className={`transition-opacity duration-slow ${hudLoader && !started ? 'pointer-events-none opacity-0' : 'opacity-100'}`}><Header /></div>
       <PageTransition>
         {(display) => (
           <main id="main" tabIndex={-1} className="outline-none">

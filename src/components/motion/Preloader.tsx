@@ -13,6 +13,8 @@ interface Props {
   /** Fires when the curtain starts to open, so the page underneath can start its intro in sync. */
   onReveal?: () => void
   onDone: () => void
+  /** 'curtain' = opaque loader with the excavator scene; 'hud' = transparent game-style readout over the live 3D hero. */
+  variant?: 'curtain' | 'hud'
 }
 
 /** Scene (viewBox 800×420): ground surface at y=320, strata below it. */
@@ -33,7 +35,8 @@ const WRIST = [566, 252] as const
  * cross-section; the amber cut line along the ground is the real progress. Min 1.6s / max 4s, then a
  * two-panel curtain from the centre. Runs once per session. Reduced motion: 400ms fade.
  */
-export function Preloader({ pathname, onReveal, onDone }: Props) {
+export function Preloader({ pathname, onReveal, onDone, variant = 'curtain' }: Props) {
+  const hud = variant === 'hud'
   const root = useRef<HTMLDivElement>(null)
   const counter = useRef<HTMLSpanElement>(null)
   const logo = useRef<HTMLImageElement>(null)
@@ -65,6 +68,12 @@ export function Preloader({ pathname, onReveal, onDone }: Props) {
         return
       }
       const tl = gsap.timeline({ onComplete: () => { setDone(true); onDone() } })
+      if (hud) {
+        tl.call(() => onReveal?.(), [], 0)
+        tl.to(el.querySelectorAll('[data-pre-content]'), { opacity: 0, scale: 1.04, duration: 0.6, ease: 'power2.inOut', stagger: 0.03 }, 0)
+        tl.to(el, { opacity: 0, duration: 0.4 }, 0.5)
+        return
+      }
       tl.to(el.querySelectorAll('[data-pre-content]'), { opacity: 0, y: -16, duration: 0.35, ease: 'power2.in', stagger: 0.04 })
       tl.call(() => onReveal?.(), [], '-=0.05')
       tl.to(el.querySelector('[data-curtain="top"]'), { scaleY: 0, transformOrigin: '50% 0%', duration: PRELOADER.curtainDuration, ease: EASE.expoInOut }, '<')
@@ -79,7 +88,7 @@ export function Preloader({ pathname, onReveal, onDone }: Props) {
     gsap.fromTo(logo.current, { clipPath: 'inset(100% 0 0 0)' }, { clipPath: 'inset(0% 0 0 0)', duration: 1.1, ease: EASE.expoInOut, delay: 0.1 })
     // Excavator dig cycle: boom, stick and bucket swing on nested pivots; dust bursts at the bottom of the stroke.
     const sv = scene.current
-    if (sv) {
+    if (sv && !hud) {
       const boom = sv.querySelector('[data-boom]')
       const stick = sv.querySelector('[data-stick]')
       const bucket = sv.querySelector('[data-bucket]')
@@ -129,7 +138,29 @@ export function Preloader({ pathname, onReveal, onDone }: Props) {
 
   if (done) return null
   return (
-    <div ref={root} className="theme-dark fixed inset-0 z-preloader" role="status" aria-label="Loading" aria-live="polite">
+    <div ref={root} className={`theme-dark fixed inset-0 z-preloader ${hud ? 'pointer-events-none' : ''}`} role="status" aria-label="Loading" aria-live="polite">
+      {hud ? (
+        <>
+          {/* Game-style HUD over the live 3D world: brackets, telemetry, big progress */}
+          <div data-pre-content className="hud-corners absolute inset-x-gutter bottom-8 top-24 opacity-70" aria-hidden="true"><span className="hud-c" /></div>
+          <div data-pre-content className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-ink/70 to-transparent" aria-hidden="true" />
+          <div data-pre-content className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-ink/70 to-transparent" aria-hidden="true" />
+          <img data-pre-content ref={logo} src={SITE.logo} alt={SITE.title} width={179} height={70} className="absolute left-gutter top-6 h-10 w-auto md:h-11" style={reduced ? undefined : { clipPath: 'inset(100% 0 0 0)' }} />
+          <div data-pre-content className="absolute right-gutter top-8 font-body text-[11px] uppercase text-bone/70 hud-mono" aria-hidden="true">Site survey · initialising</div>
+          <div data-pre-content className="absolute inset-x-0 top-1/2 flex -translate-y-1/2 flex-col items-center gap-4 px-gutter text-center">
+            <p className="font-body text-[11px] uppercase tracking-[0.3em] text-amber hud-mono">Loading world</p>
+            <div className="flex items-baseline gap-3">
+              <span ref={counter} className="font-display text-[clamp(5rem,14vw,12rem)] tabular-nums leading-none text-bone drop-shadow-[0_2px_24px_rgba(0,0,0,0.6)]" aria-hidden="true">{reduced ? '' : '000'}</span>
+              <span className="font-body text-eyebrow uppercase text-bone/60">%</span>
+            </div>
+            <div className="relative h-px w-[min(36rem,80vw)] bg-bone/20" aria-hidden="true">
+              <div ref={cut} className="absolute inset-y-0 left-0 w-full origin-left bg-amber shadow-amber-glow" style={{ transform: 'scaleX(0)' }} />
+            </div>
+          </div>
+          <div data-pre-content className="absolute bottom-8 left-gutter font-body text-eyebrow uppercase text-bone/60">Moving earth since 1983</div>
+          <div data-pre-content className="absolute bottom-8 right-gutter hidden font-body text-eyebrow uppercase text-bone/60 md:block">Scroll to descend</div>
+        </>
+      ) : (<>
       <div data-curtain="top" className="absolute inset-x-0 top-0 h-1/2 bg-ink" />
       <div data-curtain="bottom" className="absolute inset-x-0 bottom-0 h-1/2 bg-ink" />
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-8 px-gutter">
@@ -193,6 +224,7 @@ export function Preloader({ pathname, onReveal, onDone }: Props) {
       </div>
       <div data-pre-content className="absolute bottom-8 left-gutter font-body text-eyebrow uppercase text-bone/50">Moving earth since 1983</div>
       <div data-pre-content className="absolute bottom-8 right-gutter hidden font-body text-eyebrow uppercase text-bone/50 md:block">GRN Constructions</div>
+      </>)}
     </div>
   )
 }

@@ -44,6 +44,10 @@ void main() {
   float tracks = exp(-pow((abs(vRoadD) - 0.42) * 9.0, 2.0));
   roadCol *= 1.0 - 0.22 * tracks;
   col = mix(col, roadCol, vRoad);
+  // Sump: standing water at the lowest point of the floor.
+  float floorR = length(vWorld.xz);
+  float pond = (1.0 - smoothstep(0.10, 0.13, floorR)) * step(0.41, vDepth);
+  col = mix(col, vec3(0.16, 0.22, 0.24) + 0.08 * vnoise(vWorld.xz * 60.0), pond);
   // Lighting: sun + hemisphere ambient.
   float diff = max(dot(n, normalize(uSun)), 0.0);
   float hemi = 0.5 + 0.5 * n.y;

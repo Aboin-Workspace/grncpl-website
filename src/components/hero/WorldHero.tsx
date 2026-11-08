@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { m } from 'motion/react'
-import { Box, Camera, Cylinder, Geometry, Mesh, Program, Renderer, Transform, Triangle } from 'ogl'
+import { Box, Camera, Cylinder, Geometry, Mesh, Program, Renderer, Sphere, Transform, Triangle } from 'ogl'
 import { gsap, useGSAP, ScrollTrigger } from '@/lib/gsap'
 import { getLenis } from '@/lib/lenis'
-import { roadPoint, spline } from '@/lib/pit'
+import { benchPoint, roadPoint, spline } from '@/lib/pit'
 import { onIdle } from '@/lib/idle'
 import { HERO, TERRAIN, WORLD } from '@/config/motion'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
@@ -215,22 +215,38 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
     const hubGeo = new Cylinder(gl, { radiusTop: 0.006, radiusBottom: 0.006, height: 0.012, radialSegments: 8 })
     const stackGeo = new Cylinder(gl, { radiusTop: 0.002, radiusBottom: 0.002, height: 0.018, radialSegments: 6 })
     const shadowGeo = new Cylinder(gl, { radiusTop: 0.052, radiusBottom: 0.052, height: 0.001, radialSegments: 18 })
-    const shadowMat = new Program(gl, { vertex: propVert, fragment: `#version 300 es\nprecision highp float; in vec3 vWorld; out vec4 o; void main(){ o = vec4(0.0,0.0,0.0,0.45); }`, transparent: true, depthWrite: false })
     const trucks: { node: Transform; offset: number; dir: number; wheels: Mesh[]; lane: number }[] = []
+    const shadowMat = new Program(gl, { vertex: propVert, fragment: `#version 300 es\nprecision highp float; in vec3 vWorld; out vec4 o; void main(){ o = vec4(0.0,0.0,0.0,0.45); }`, transparent: true, depthWrite: false })
+    const emissive = new Program(gl, { vertex: propVert, fragment: `#version 300 es\nprecision highp float; uniform vec3 uColor; uniform float uPulse; in vec3 vWorld; out vec4 o; void main(){ o = vec4(uColor * (0.6 + 0.9 * uPulse), 1.0); }`, uniforms: { uColor: { value: [...W.beacon] }, uPulse: { value: 1 } } })
+    const lampGeo = new Sphere(gl, { radius: 0.003, widthSegments: 8, heightSegments: 6 })
+    const headlampGeo = new Box(gl, { width: 0.003, height: 0.005, depth: 0.006 })
+    const headlamp = new Program(gl, { vertex: propVert, fragment: `#version 300 es\nprecision highp float; in vec3 vWorld; out vec4 o; void main(){ o = vec4(1.0, 0.95, 0.8, 1.0); }` })
+    const grilleGeo = new Box(gl, { width: 0.004, height: 0.018, depth: 0.03 })
+    const guardGeo = new Box(gl, { width: 0.03, height: 0.004, depth: 0.014 })
+    const ladderGeo = new Box(gl, { width: 0.003, height: 0.03, depth: 0.008 })
+    const ribGeo = new Box(gl, { width: 0.003, height: 0.03, depth: 0.052 })
+    const place = (node: Transform, geo: Geometry, prog: Program, x: number, y: number, z: number, rx = 0, rz = 0, ry = 0) => {
+      const mesh = new Mesh(gl, { geometry: geo, program: prog }); mesh.position.set(x, y, z); mesh.rotation.set(rx, ry, rz); mesh.setParent(node); return mesh
+    }
     for (let i = 0; i < W.trucks.count; i++) {
       const node = new Transform()
       node.scale.set(W.trucks.scale, W.trucks.scale, W.trucks.scale)
-      const add = (geo: Geometry, prog: Program, x: number, y: number, z: number, rx = 0, rz = 0) => {
-        const mesh = new Mesh(gl, { geometry: geo, program: prog }); mesh.position.set(x, y, z); mesh.rotation.x = rx; mesh.rotation.z = rz; mesh.setParent(node); return mesh
-      }
+      const add = (geo: Geometry, prog: Program, x: number, y: number, z: number, rx = 0, rz = 0) => place(node, geo, prog, x, y, z, rx, rz)
       add(shadowGeo, shadowMat, 0, 0.0008, 0)
       add(chassisGeo, dark, 0, 0.02, 0)
       add(deckGeo, steel, -0.01, 0.03, 0)
       const tip = add(tipperGeo, paint, -0.012, 0.034, 0); tip.rotation.z = 0.04
       add(tipperInnerGeo, paintDark, -0.012, 0.064, 0)
+      for (const rx of [-0.03, -0.012, 0.006]) add(ribGeo, paintDark, rx, 0.05, 0)
       add(cabGeo, paint, 0.03, 0.046, -0.008)
       add(cabGlassGeo, glass, 0.041, 0.05, -0.008)
+      add(grilleGeo, dark, 0.047, 0.03, 0)
+      add(headlampGeo, headlamp, 0.047, 0.036, 0.012)
+      add(headlampGeo, headlamp, 0.047, 0.036, -0.012)
+      add(ladderGeo, steel, 0.03, 0.03, 0.021)
+      for (const [x, z] of [[0.03, 0.026], [-0.027, 0.028], [-0.027, -0.028], [0.03, -0.026]] as const) add(guardGeo, dark, x, 0.026, z)
       add(stackGeo, dark, 0.024, 0.062, 0.012)
+      add(lampGeo, emissive, 0.03, 0.062, -0.008)
       const wheels: Mesh[] = []
       for (const [x, z] of [[0.03, 0.024], [0.03, -0.024], [-0.018, 0.026], [-0.018, -0.026], [-0.036, 0.026], [-0.036, -0.026]] as const) {
         wheels.push(add(wheelGeo, dark, x, 0.012, z, Math.PI / 2))
@@ -239,6 +255,67 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
       node.setParent(scene)
       const dir = i % 2 === 0 ? 1 : -1
       trucks.push({ node, offset: (i / W.trucks.count) * (T.pit.benches - 0.3) + 0.15, dir, wheels, lane: dir * W.trucks.laneOffset })
+    }
+
+    // Excavators: tracked base, slewing house, boom → stick → bucket on nested pivots, digging the toe of a batter.
+    const X = W.excavators
+    const exPaint = mkProg(X.paint)
+    const trackGeo = new Box(gl, { width: 0.07, height: 0.016, depth: 0.018 })
+    const carGeo = new Box(gl, { width: 0.04, height: 0.012, depth: 0.04 })
+    const houseGeo = new Box(gl, { width: 0.07, height: 0.03, depth: 0.044 })
+    const exCabGeo = new Box(gl, { width: 0.022, height: 0.028, depth: 0.02 })
+    const exGlassGeo = new Box(gl, { width: 0.006, height: 0.016, depth: 0.016 })
+    const cwGeo = new Box(gl, { width: 0.02, height: 0.026, depth: 0.044 })
+    const boomGeo = new Box(gl, { width: 0.11, height: 0.016, depth: 0.014 })
+    const stickGeo = new Box(gl, { width: 0.08, height: 0.012, depth: 0.011 })
+    const bucketGeo = new Box(gl, { width: 0.028, height: 0.024, depth: 0.03 })
+    const cylGeo = new Cylinder(gl, { radiusTop: 0.003, radiusBottom: 0.003, height: 0.06, radialSegments: 6 })
+    const excavators: { house: Transform; boom: Transform; stick: Transform; bucket: Transform; phase: number; base: number }[] = []
+    for (let i = 0; i < X.count; i++) {
+      const bench = 1 + i // benches 1..4
+      const ang = (i / X.count) * Math.PI * 2 + 1.1 + bench * 0.9 // staggered, away from the road entry
+      const pt = benchPoint(bench, 0.5, ang)
+      const root = new Transform(); root.position.set(pt.x, pt.y + 0.002, pt.z); root.scale.set(X.scale, X.scale, X.scale)
+      const facing = ang + Math.PI // face the inner batter (toward the pit centre)
+      root.rotation.y = -facing
+      place(root, trackGeo, dark, 0, 0.008, 0.02); place(root, trackGeo, dark, 0, 0.008, -0.02)
+      place(root, carGeo, steel, 0, 0.02, 0)
+      const house = new Transform(); house.position.set(0, 0.026, 0); house.setParent(root)
+      place(house, houseGeo, exPaint, -0.01, 0.015, 0)
+      place(house, cwGeo, dark, -0.046, 0.013, 0)
+      place(house, exCabGeo, exPaint, 0.016, 0.032, 0.014)
+      place(house, exGlassGeo, glass, 0.03, 0.034, 0.014)
+      place(house, lampGeo, emissive, -0.02, 0.034, -0.016)
+      const boom = new Transform(); boom.position.set(0.02, 0.028, -0.004); boom.setParent(house)
+      place(boom, boomGeo, exPaint, 0.05, 0.012, 0, 0, 0.5)
+      place(boom, cylGeo, steel, 0.03, 0.03, 0.009, 0, 1.2)
+      const stick = new Transform(); stick.position.set(0.092, 0.062, 0); stick.setParent(boom)
+      place(stick, stickGeo, exPaint, 0.03, -0.02, 0, 0, -1.0)
+      const bucket = new Transform(); bucket.position.set(0.058, -0.06, 0); bucket.setParent(stick)
+      place(bucket, bucketGeo, dark, 0.008, -0.012, 0)
+      root.setParent(scene)
+      excavators.push({ house, boom, stick, bucket, phase: i * 1.7, base: -facing })
+    }
+
+    // Drill rigs: tracked base with a tall mast; the drill string plunges and dust puffs at the bit.
+    const D = W.drills
+    const drillPaint = mkProg(D.paint)
+    const mastGeo = new Box(gl, { width: 0.012, height: 0.12, depth: 0.012 })
+    const drillBaseGeo = new Box(gl, { width: 0.05, height: 0.02, depth: 0.04 })
+    const stringGeo = new Cylinder(gl, { radiusTop: 0.0025, radiusBottom: 0.0025, height: 0.09, radialSegments: 6 })
+    const drills: { string: Mesh; phase: number; pos: [number, number, number] }[] = []
+    for (let i = 0; i < D.count; i++) {
+      const bench = 2 + i * 2
+      const ang = 2.6 + i * 2.1 + bench * 0.9
+      const pt = benchPoint(bench, 0.35, ang)
+      const root = new Transform(); root.position.set(pt.x, pt.y + 0.002, pt.z); root.scale.set(D.scale, D.scale, D.scale); root.rotation.y = -ang
+      place(root, trackGeo, dark, 0, 0.008, 0.016); place(root, trackGeo, dark, 0, 0.008, -0.016)
+      place(root, drillBaseGeo, drillPaint, 0, 0.026, 0)
+      place(root, mastGeo, steel, 0.03, 0.09, 0)
+      place(root, lampGeo, emissive, 0.03, 0.152, 0)
+      const str = place(root, stringGeo, dark, 0.03, 0.06, 0)
+      root.setParent(scene)
+      drills.push({ string: str, phase: i * 2.3, pos: [pt.x, pt.y, pt.z] })
     }
 
     // Dust trails: a pool of puffs re-spawned at the rear of each truck.
@@ -312,8 +389,13 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
       // intro: ease from a far, high vantage into the first key
       const k = introState.t
       if (k < 1) {
+        // While loading: a slow orbit at the far vantage, then ease into the first key.
+        const a = Math.sin(t * 0.12) * 0.18
+        const fx = W.intro.from[0] * Math.cos(a) - W.intro.from[2] * Math.sin(a)
+        const fz = W.intro.from[0] * Math.sin(a) + W.intro.from[2] * Math.cos(a)
+        const from = [fx, W.intro.from[1] + Math.sin(t * 0.2) * 0.05, fz]
         const e = 1 - Math.pow(1 - k, 3)
-        for (let i = 0; i < 3; i++) pos[i] = W.intro.from[i] + (pos[i] - W.intro.from[i]) * e
+        for (let i = 0; i < 3; i++) pos[i] = from[i] + (pos[i] - from[i]) * e
       }
       // pointer steers the look target sideways / up-down
       const fx = look[0] - pos[0], fz = look[2] - pos[2]
@@ -355,6 +437,22 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
       })
       trailGeo.attributes.position.needsUpdate = true
       trailProg.uniforms.uTime.value = t
+      // machines
+      emissive.uniforms.uPulse.value = 0.5 + 0.5 * Math.sin(t * 4.0)
+      excavators.forEach((ex) => {
+        const c = ((t + ex.phase) % X.cycleSeconds) / X.cycleSeconds // 0..1 dig cycle
+        const dig = c < 0.45 ? c / 0.45 : 0                         // digging (down + curl)
+        const swing = c >= 0.45 && c < 0.75 ? (c - 0.45) / 0.3 : 0   // swing to dump
+        const back = c >= 0.75 ? (c - 0.75) / 0.25 : 0               // swing back
+        const ease = (v: number) => v * v * (3 - 2 * v)
+        const slew = swing ? ease(swing) : back ? 1 - ease(back) : 0
+        ex.house.rotation.y = slew * 1.1
+        const bite = Math.sin(ease(dig) * Math.PI)
+        ex.boom.rotation.z = -0.15 - bite * 0.35 + slew * 0.25
+        ex.stick.rotation.z = 0.2 + bite * 0.9 - slew * 0.3
+        ex.bucket.rotation.z = -0.3 + bite * 1.2 - slew * 0.9
+      })
+      drills.forEach((d) => { d.string.position.y = 0.06 - 0.035 * (0.5 + 0.5 * Math.sin(t * 1.3 + d.phase)) })
       renderer.render({ scene: sky, camera, clear: true })
       renderer.render({ scene, camera, clear: false })
     }
@@ -411,8 +509,10 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
         </m.div>
       </div>
 
-      <SlideChrome ref={chrome} slides={slides} index={index} paused={false} onSelect={scrollToStage} onPrev={() => scrollToStage(Math.max(0, index - 1))} onNext={() => scrollToStage(Math.min(n - 1, index + 1))} />
-      {!reduced && <ScrollCue />}
+      <m.div className="absolute inset-0 z-20" initial={false} animate={{ opacity: started ? 1 : 0 }} transition={{ duration: reduced ? 0 : 1.2, delay: started && !reduced ? 1.6 : 0, ease: [0.16, 1, 0.3, 1] }} style={{ pointerEvents: started ? undefined : 'none' }}>
+        <SlideChrome ref={chrome} slides={slides} index={index} paused={false} onSelect={scrollToStage} onPrev={() => scrollToStage(Math.max(0, index - 1))} onNext={() => scrollToStage(Math.min(n - 1, index + 1))} />
+        {!reduced && <ScrollCue />}
+      </m.div>
       <div className="sr-only" aria-live="polite" aria-atomic="true">Stage {index + 1} of {n}: {slides[index].title}</div>
     </section>
   )

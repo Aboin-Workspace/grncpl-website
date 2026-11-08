@@ -83,7 +83,9 @@ void main() {
   float road = (1.0 - smoothstep(0.0, uRoadWidth, d)) * step(0.001, tc) * (1.0 - step(uBenches - 0.001, tc));
   float sd = mod(ang - roadAng + TAU * 2.0 + TAU * 0.5, TAU) - TAU * 0.5;
   vRoadD = clamp(sd / uRoadWidth, -1.0, 1.0);
-  float h = mix(stepped, smoothH, road);
+  // Safety berm: a small windrow along the crest (outer edge) of every bench, off the road.
+  float berm = exp(-pow((f - 0.06) * 22.0, 2.0)) * step(0.5, tc) * 0.012;
+  float h = mix(stepped + berm, smoothH, road);
   float n = snoise(vec3(xz * uNoiseFreq, 3.0)) * 0.7 + snoise(vec3(xz * uNoiseFreq * 2.1, 7.0)) * 0.3;
   float outer = smoothstep(uPitRadius - 0.02, uPitRadius + 0.6, r);
   h += n * uNoiseAmp * mix(uInner, 1.0, outer) * (1.0 - road * 0.9);
