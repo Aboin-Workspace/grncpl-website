@@ -5,6 +5,9 @@ import { TERRAIN } from '@/config/motion'
  * used to place trucks and the camera on the spiral haul road.
  */
 const TAU = Math.PI * 2
+
+/** Rim warp: the pit outline deviates from a circle by angle (mirrors world.vert.glsl `rimWarp`). */
+export const rimWarp = (ang: number) => 1 + 0.07 * Math.sin(2 * ang + 0.7) + 0.045 * Math.sin(3 * ang - 1.9) + 0.025 * Math.sin(5 * ang + 2.3)
 const P = TERRAIN.pit
 const R = TERRAIN.road
 
@@ -12,7 +15,7 @@ const R = TERRAIN.road
 export function roadPoint(tc: number, lane = 0): { x: number; y: number; z: number; angle: number } {
   const t = Math.max(0, Math.min(P.benches, tc))
   const angle = (t / P.benches) * R.turns * TAU
-  const r = P.radius - t * P.benchWidth + 0.02 + lane
+  const r = (P.radius - t * P.benchWidth + 0.02 + lane) * rimWarp(angle)
   // Height of the smooth road surface at this actual radius (the +0.02/lane shift moves it outward → higher).
   const y = -(t - (0.02 + lane) / P.benchWidth) * P.benchDepth
   return { x: r * Math.cos(angle), y, z: r * Math.sin(angle), angle }
@@ -34,7 +37,7 @@ export function spline(pts: ReadonlyArray<readonly [number, number, number]>, u:
 
 /** Height of the stepped pit surface (no surface noise) at a mesh-space point, matching world.vert.glsl. */
 export function pitHeight(x: number, z: number, ramp = 0.55): number {
-  const r = Math.hypot(x, z)
+  const r = Math.hypot(x, z) / rimWarp(Math.atan2(z, x))
   const t = (P.radius - r) / P.benchWidth
   const tc = Math.max(0, Math.min(P.benches, t))
   const bench = Math.floor(tc)
@@ -47,7 +50,7 @@ export function pitHeight(x: number, z: number, ramp = 0.55): number {
 
 /** A point on the flat of bench `b` at angle `ang`, `f` ∈ (0,1) of the way across the bench. */
 export function benchPoint(b: number, f: number, ang: number): { x: number; y: number; z: number } {
-  const r = P.radius - (b + f) * P.benchWidth
+  const r = (P.radius - (b + f) * P.benchWidth) * rimWarp(ang)
   const x = r * Math.cos(ang), z = r * Math.sin(ang)
   return { x, y: pitHeight(x, z), z }
 }

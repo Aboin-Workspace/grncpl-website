@@ -19,6 +19,7 @@ out vec3 vWorld;
 out float vDepth;
 out float vRoad;
 out float vBench;
+out float vF; // fract across a bench (0 at the crest)
 out float vRoadD; // -1..1 across the road width
 
 vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -68,8 +69,9 @@ const float TAU = 6.28318530718;
 
 void main() {
   vec2 xz = position.xz;
-  float r = length(xz);
   float ang = atan(xz.y, xz.x);
+  float rimWarp = 1.0 + 0.07 * sin(2.0 * ang + 0.7) + 0.045 * sin(3.0 * ang - 1.9) + 0.025 * sin(5.0 * ang + 2.3);
+  float r = length(xz) / rimWarp;
   float t = (uPitRadius - r) / uBenchWidth;
   float tc = clamp(t, 0.0, uBenches);
   float bench = floor(tc);
@@ -84,7 +86,10 @@ void main() {
   float sd = mod(ang - roadAng + TAU * 2.0 + TAU * 0.5, TAU) - TAU * 0.5;
   vRoadD = clamp(sd / uRoadWidth, -1.0, 1.0);
   // Safety berm: a small windrow along the crest (outer edge) of every bench, off the road.
-  float berm = exp(-pow((f - 0.06) * 22.0, 2.0)) * step(0.5, tc) * 0.012;
+  // Rubble along the berm + loose spoil at the toe of each batter.
+  float berm = exp(-pow((f - 0.06) * 22.0, 2.0)) * step(0.5, tc) * (0.010 + 0.006 * snoise(vec3(xz * 40.0, 1.0)));
+  float toe = exp(-pow((f - 0.98) * 30.0, 2.0)) * step(0.5, tc) * 0.004 * (0.5 + 0.5 * snoise(vec3(xz * 55.0, 5.0)));
+  berm += toe;
   float h = mix(stepped + berm, smoothH, road);
   float n = snoise(vec3(xz * uNoiseFreq, 3.0)) * 0.7 + snoise(vec3(xz * uNoiseFreq * 2.1, 7.0)) * 0.3;
   float outer = smoothstep(uPitRadius - 0.02, uPitRadius + 0.6, r);
@@ -93,6 +98,7 @@ void main() {
   vWorld = (modelMatrix * vec4(pos, 1.0)).xyz;
   vDepth = -h;
   vRoad = road;
-  vBench = 1.0 - ramp; // 1 on the flat of a bench, 0 on the batter
+  vBench = 1.0 - ramp;
+  vF = f; // 1 on the flat of a bench, 0 on the batter
   gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
 }

@@ -15,6 +15,7 @@ in float vDepth;
 in float vRoad;
 in float vBench;
 in float vRoadD;
+in float vF;
 out vec4 fragColor;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -36,6 +37,12 @@ void main() {
   float band = sin(vWorld.y * 260.0 + vnoise(vWorld.xz * 14.0) * 2.5);
   float strata = smoothstep(0.08, 0.35, slope) * (0.55 + 0.45 * band);
   col = mix(col, col * (0.78 + 0.34 * strata), smoothstep(0.08, 0.35, slope));
+  // Coal seam: a dark band exposed on the batters at one depth, plus thin dark partings.
+  float seam = smoothstep(0.235, 0.25, vDepth) * (1.0 - smoothstep(0.29, 0.305, vDepth));
+  col = mix(col, vec3(0.08, 0.08, 0.09), seam * smoothstep(0.08, 0.3, slope) * 0.9);
+  // Contact-shadow at the toe of each batter (cheap AO).
+  float ao = 1.0 - 0.28 * (1.0 - smoothstep(0.0, 0.18, vF)) * step(0.001, vDepth) * (1.0 - vRoad);
+  col *= ao;
   // Surface mottling: broken ground, loose spoil, tonal variety.
   float m = vnoise(vWorld.xz * 38.0) * 0.6 + vnoise(vWorld.xz * 140.0) * 0.4;
   col *= 0.86 + 0.28 * m;

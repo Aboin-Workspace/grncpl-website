@@ -236,7 +236,7 @@ export const WORLD = {
   dprCap: 1.5,
   /** Extra scroll while pinned: 4 stages across this distance. */
   pinPercent: 320,
-  scrub: 0.9,
+  scrub: 1.1,
   camera: { fov: 46, near: 0.02, far: 12, roadLift: 0.09 },
   /** Lighting + atmosphere (linear RGB 0..1). */
   sun: [0.45, 0.75, 0.35] as [number, number, number],
@@ -261,6 +261,9 @@ export const WORLD = {
   /** Fraction of a stage the scroll must pass a boundary by before the headline changes. */
   stageHysteresis: 0.08,
   pointer: { yaw: 0.14, pitch: 0.07, lerp: 0.05 },
+  /** Camera follow: critically-damped spring (rad/s) on scroll progress, bank angle per unit progress velocity, idle sway. */
+  flight: { omega: 3.2, bank: 0.9, swayAmp: 0.004, swayHz: 0.35 },
+  workers: { count: 14, scale: 0.55, hiVis: [0.98, 0.45, 0.08] as [number, number, number], helmet: [0.95, 0.85, 0.15] as [number, number, number] },
   /** Dust motes in the air (GL points). */
   dust: { count: 900, size: 2.2, alpha: 0.35 },
 } as const

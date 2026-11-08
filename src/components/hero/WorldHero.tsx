@@ -318,6 +318,49 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
       drills.push({ string: str, phase: i * 2.3, pos: [pt.x, pt.y, pt.z] })
     }
 
+    // Muck piles beside each excavator (loose spoil cones).
+    const pileGeo = new Cylinder(gl, { radiusTop: 0.002, radiusBottom: 0.03, height: 0.014, radialSegments: 9 })
+    const pileMat = mkProg([0.42, 0.33, 0.22])
+    excavators.forEach((ex, i) => {
+      const pile = new Mesh(gl, { geometry: pileGeo, program: pileMat })
+      const bench = 1 + i
+      const ang = (i / X.count) * Math.PI * 2 + 1.1 + bench * 0.9 + 0.22
+      const pt = benchPoint(bench, 0.5, ang)
+      pile.position.set(pt.x, pt.y + 0.006, pt.z); pile.scale.set(X.scale * 1.6, X.scale * 1.6, X.scale * 1.6)
+      pile.setParent(scene)
+      void ex
+    })
+
+    // Work crews: hi-vis figures near the machines and on the floor (legs, vest, head, helmet), idling.
+    const K = W.workers
+    const vest = mkProg(K.hiVis)
+    const helmet = mkProg(K.helmet)
+    const skin = mkProg([0.55, 0.40, 0.30])
+    const trouser = mkProg([0.16, 0.17, 0.22])
+    const legGeo = new Box(gl, { width: 0.0022, height: 0.0055, depth: 0.0022 })
+    const torsoGeo = new Box(gl, { width: 0.005, height: 0.0055, depth: 0.0032 })
+    const armGeo = new Box(gl, { width: 0.0016, height: 0.005, depth: 0.0016 })
+    const headGeo = new Sphere(gl, { radius: 0.0018, widthSegments: 8, heightSegments: 6 })
+    const hatGeo = new Cylinder(gl, { radiusTop: 0.0022, radiusBottom: 0.0024, height: 0.0014, radialSegments: 8 })
+    const workers: { node: Transform; phase: number; base: number }[] = []
+    const spots: { x: number; y: number; z: number; face: number }[] = []
+    excavators.forEach((_, i) => {
+      const bench = 1 + i
+      for (const da of [-0.16, -0.22]) { const ang = (i / X.count) * Math.PI * 2 + 1.1 + bench * 0.9 + da; const pt = benchPoint(bench, 0.35, ang); spots.push({ ...pt, face: ang }) }
+    })
+    for (let i = 0; i < D.count; i++) { const bench = 2 + i * 2; const ang = 2.6 + i * 2.1 + bench * 0.9 + 0.14; const pt = benchPoint(bench, 0.5, ang); spots.push({ ...pt, face: ang + 1 }) }
+    for (let i = 0; i < 4; i++) { const ang = 0.6 + i * 1.5; const pt = benchPoint(T.pit.benches - 0.02, 0.0, ang); const r = 0.16 + i * 0.02; spots.push({ x: r * Math.cos(ang), y: pt.y, z: r * Math.sin(ang), face: ang + 2 }) }
+    spots.slice(0, K.count).forEach((sp, i) => {
+      const node = new Transform(); node.position.set(sp.x, sp.y + 0.001, sp.z); node.scale.set(K.scale, K.scale, K.scale); node.rotation.y = -sp.face
+      place(node, legGeo, trouser, -0.0014, 0.00275, 0); place(node, legGeo, trouser, 0.0014, 0.00275, 0)
+      place(node, torsoGeo, vest, 0, 0.0083, 0)
+      place(node, armGeo, vest, -0.0034, 0.0083, 0, 0, 0.25); place(node, armGeo, vest, 0.0034, 0.0083, 0, 0, -0.25)
+      place(node, headGeo, skin, 0, 0.0128, 0)
+      place(node, hatGeo, helmet, 0, 0.0148, 0)
+      node.setParent(scene)
+      workers.push({ node, phase: i * 1.3, base: -sp.face })
+    })
+
     // Dust trails: a pool of puffs re-spawned at the rear of each truck.
     const TN = W.trucks.count * W.trucks.trailPuffs
     const tpos = new Float32Array(TN * 3)
@@ -375,13 +418,17 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
 
     const t0 = performance.now()
     let smooth = 0
+    let vel = 0
     const introState = { t: startedRef.current ? 1 : 0 }
     introRef.current = introState
     let lastT = 0
     const draw = (t: number) => {
       const dt = Math.min(0.05, t - lastT); lastT = t
       const p = progress.current
-      smooth += (p - smooth) * 0.12
+      // critically damped spring toward the scroll position: no snap, no overshoot
+      const F = W.flight
+      vel += ((p - smooth) * F.omega * F.omega - 2 * F.omega * vel) * dt
+      smooth += vel * dt
       ptr.x += (ptr.tx - ptr.x) * W.pointer.lerp
       ptr.y += (ptr.ty - ptr.y) * W.pointer.lerp
       const pos = spline(posKeys, smooth)
@@ -404,8 +451,10 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
       look[0] += rx * ptr.x * W.pointer.yaw
       look[2] += rz * ptr.x * W.pointer.yaw
       look[1] -= ptr.y * W.pointer.pitch
+      pos[1] += Math.sin(t * F.swayHz * Math.PI * 2) * F.swayAmp
       camera.position.set(pos[0], pos[1], pos[2])
       camera.lookAt(look)
+      camera.rotation.z += Math.max(-0.12, Math.min(0.12, -vel * F.bank))
       shared.uCam.value = [pos[0], pos[1], pos[2]]
       terrain.program.uniforms.uTime.value = t
       dustProg.uniforms.uTime.value = t
@@ -452,6 +501,7 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
         ex.stick.rotation.z = 0.2 + bite * 0.9 - slew * 0.3
         ex.bucket.rotation.z = -0.3 + bite * 1.2 - slew * 0.9
       })
+      workers.forEach((wk) => { wk.node.rotation.y = wk.base + Math.sin(t * 0.6 + wk.phase) * 0.35; wk.node.position.y += 0 })
       drills.forEach((d) => { d.string.position.y = 0.06 - 0.035 * (0.5 + 0.5 * Math.sin(t * 1.3 + d.phase)) })
       renderer.render({ scene: sky, camera, clear: true })
       renderer.render({ scene, camera, clear: false })
