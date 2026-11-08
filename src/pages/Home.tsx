@@ -1,5 +1,5 @@
+import { lazy, Suspense } from 'react'
 import { Hero } from '@/components/hero/Hero'
-import { WorldHero } from '@/components/hero/WorldHero'
 import { hasWebGL } from '@/lib/webgl'
 import { useIsDesktop } from '@/hooks/useMediaQuery'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
@@ -17,6 +17,8 @@ import { OperatingArea } from './home/OperatingArea'
 import { StrataDivider } from '@/components/motion/StrataDivider'
 import { Defer } from '@/components/motion/Defer'
 
+const WorldHero = lazy(() => import('@/components/hero/WorldHero').then((mod) => ({ default: mod.WorldHero })))
+
 export default function Home() {
   const { started } = useAppState()
   // The scroll-driven 3D world needs a desktop viewport and WebGL; everything else gets the photo hero.
@@ -26,7 +28,7 @@ export default function Home() {
   return (
     <>
       <Seo path="/" localBusiness />
-      {world ? <WorldHero slides={HERO_SLIDES} subtext={HERO_SUBTEXT} started={started} /> : <Hero slides={HERO_SLIDES} subtext={HERO_SUBTEXT} started={started} />}
+      {world ? <Suspense fallback={<div className="theme-dark h-[100svh] bg-ink" />}><WorldHero slides={HERO_SLIDES} subtext={HERO_SUBTEXT} started={started} /></Suspense> : <Hero slides={HERO_SLIDES} subtext={HERO_SUBTEXT} started={started} />}
       <div className="relative z-10">
         <Pillars />
         <Defer>

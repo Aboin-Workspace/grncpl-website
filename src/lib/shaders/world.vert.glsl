@@ -20,7 +20,12 @@ out float vDepth;
 out float vRoad;
 out float vBench;
 out float vF; // fract across a bench (0 at the crest)
-out float vRoadD; // -1..1 across the road width
+out float vRoadD;
+out vec3 vNormal;
+out vec4 vShadow;
+out float vTc;
+uniform mat4 shadowProjectionMatrix;
+uniform mat4 shadowViewMatrix; // -1..1 across the road width
 
 vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
 vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -66,39 +71,64 @@ float snoise(vec3 v) {
   return 42.0 * dot(m * m, vec4(dot(p0, x0), dot(p1, x1), dot(p2, x2), dot(p3, x3)));
 }
 const float TAU = 6.28318530718;
+float gTc, gT, gF, gRamp, gRoad, gSd;
+
+// Stepped pit surface without noise. Sets the g* values for the point it was last called with.
+float baseH(vec2 xz) {
+  float ang = atan(xz.y, xz.x);
+  float warp = 1.0 + 0.07 * sin(2.0 * ang + 0.7) + 0.045 * sin(3.0 * ang - 1.9) + 0.025 * sin(5.0 * ang + 2.3);
+  float r = length(xz) / warp;
+  gT = (uPitRadius - r) / uBenchWidth;
+  gTc = clamp(gT, 0.0, uBenches);
+  float bench = floor(gTc);
+  gF = fract(gTc);
+  gRamp = smoothstep(1.0 - uRamp, 1.0, gF);
+  float stepped = -(bench + gRamp) * uBenchDepth;
+  float smoothH = -gTc * uBenchDepth;
+  float roadAng = (gTc / uBenches) * uRoadTurns * TAU;
+  float d = mod(ang - roadAng + TAU * 2.0, TAU);
+  d = min(d, TAU - d);
+  gRoad = (1.0 - smoothstep(0.0, uRoadWidth, d)) * step(0.001, gTc) * (1.0 - step(uBenches - 0.001, gTc));
+  gSd = mod(ang - roadAng + TAU * 2.5, TAU) - TAU * 0.5;
+  // Safety berm along the crest: the flat of a bench ends where the next batter starts.
+  float crest = 1.0 - uRamp;
+  float berm = exp(-pow((gF - (crest - 0.05)) * 24.0, 2.0)) * step(0.5, gTc) * step(gT, uBenches) * 0.011;
+  return mix(stepped + berm, smoothH, gRoad);
+}
 
 void main() {
   vec2 xz = position.xz;
-  float ang = atan(xz.y, xz.x);
-  float rimWarp = 1.0 + 0.07 * sin(2.0 * ang + 0.7) + 0.045 * sin(3.0 * ang - 1.9) + 0.025 * sin(5.0 * ang + 2.3);
-  float r = length(xz) / rimWarp;
-  float t = (uPitRadius - r) / uBenchWidth;
-  float tc = clamp(t, 0.0, uBenches);
-  float bench = floor(tc);
-  float f = fract(tc);
-  float ramp = smoothstep(1.0 - uRamp, 1.0, f);
-  float stepped = -(bench + ramp) * uBenchDepth;
-  float smoothH = -tc * uBenchDepth;
-  float roadAng = (tc / uBenches) * uRoadTurns * TAU;
-  float d = mod(ang - roadAng + TAU * 2.0, TAU);
-  d = min(d, TAU - d);
-  float road = (1.0 - smoothstep(0.0, uRoadWidth, d)) * step(0.001, tc) * (1.0 - step(uBenches - 0.001, tc));
-  float sd = mod(ang - roadAng + TAU * 2.0 + TAU * 0.5, TAU) - TAU * 0.5;
-  vRoadD = clamp(sd / uRoadWidth, -1.0, 1.0);
-  // Safety berm: a small windrow along the crest (outer edge) of every bench, off the road.
-  // Rubble along the berm + loose spoil at the toe of each batter.
-  float berm = exp(-pow((f - 0.06) * 22.0, 2.0)) * step(0.5, tc) * (0.010 + 0.006 * snoise(vec3(xz * 40.0, 1.0)));
-  float toe = exp(-pow((f - 0.98) * 30.0, 2.0)) * step(0.5, tc) * 0.004 * (0.5 + 0.5 * snoise(vec3(xz * 55.0, 5.0)));
-  berm += toe;
-  float h = mix(stepped + berm, smoothH, road);
+  float e = 0.004;
+  // Smooth normal from the noise-free profile, so batters shade as slopes rather than ring facets.
+  float hx0 = baseH(xz - vec2(e, 0.0)), hx1 = baseH(xz + vec2(e, 0.0));
+  float hz0 = baseH(xz - vec2(0.0, e)), hz1 = baseH(xz + vec2(0.0, e));
+  vNormal = normalize(vec3(hx0 - hx1, 2.0 * e, hz0 - hz1));
+  float h = baseH(xz);
+  float r = length(xz);
+
   float n = snoise(vec3(xz * uNoiseFreq, 3.0)) * 0.7 + snoise(vec3(xz * uNoiseFreq * 2.1, 7.0)) * 0.3;
   float outer = smoothstep(uPitRadius - 0.02, uPitRadius + 0.6, r);
-  h += n * uNoiseAmp * mix(uInner, 1.0, outer) * (1.0 - road * 0.9);
+  h += n * uNoiseAmp * mix(uInner, 1.0, outer) * (1.0 - gRoad * 0.9);
+
+  // Broken rock on the batters and scree fans at their toes.
+  float wall = gRamp * (1.0 - gRamp) * 4.0;
+  h += snoise(vec3(xz * 34.0, 2.0)) * 0.007 * wall * (1.0 - gRoad);
+  float toeD = min(gF, 1.0 - gF);
+  float toe = exp(-pow(toeD * 12.0, 2.0)) * step(0.5, gTc) * smoothstep(uBenches + 0.3, uBenches, gT);
+  h += toe * (0.5 + 0.5 * snoise(vec3(xz * 18.0, 5.0))) * 0.011 * (1.0 - gRoad);
+
   vec3 pos = vec3(position.x, h, position.z);
+  // Heat shimmer: a faint wobble over the pit floor.
+  float floorZone = smoothstep(uBenches - 0.2, uBenches + 0.3, gT);
+  pos.xz += vec2(sin(uTime * 3.1 + xz.y * 90.0), cos(uTime * 2.7 + xz.x * 80.0)) * 0.0011 * floorZone;
+
   vWorld = (modelMatrix * vec4(pos, 1.0)).xyz;
   vDepth = -h;
-  vRoad = road;
-  vBench = 1.0 - ramp;
-  vF = f; // 1 on the flat of a bench, 0 on the batter
+  vRoad = gRoad;
+  vRoadD = clamp(gSd / uRoadWidth, -1.0, 1.0);
+  vBench = 1.0 - gRamp;
+  vF = gT >= uBenches ? 0.5 : gF;
+  vTc = gTc;
+  vShadow = shadowProjectionMatrix * shadowViewMatrix * vec4(vWorld, 1.0);
   gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
 }

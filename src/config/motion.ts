@@ -28,6 +28,8 @@ export const BREAKPOINT = { md: 768, lg: 1024, xl: 1440 } as const
 export const HERO = {
   /** Slides advance on their own every 6s (progress bar in the chrome). Hover never pauses; focus/Space/off-screen do. */
   autoplayMs: 6000,
+  /** Delay (ms) after the intro before the photo hero swaps its still image for the WebGL canvas. */
+  canvasDelayMs: 3000,
   swipeThresholdPx: 60,
   /** Fraction of the hero that must be visible for keyboard control + rAF to run. */
   visibleThreshold: 0.35,
@@ -252,10 +254,29 @@ export const WORLD = {
     road: [0.46, 0.41, 0.35] as [number, number, number],
   },
   trucks: { count: 7, speed: 0.11, paint: [0.93, 0.70, 0.12] as [number, number, number], scale: 0.6, trailPuffs: 14, trailAlpha: 0.22, /** Radial lane offset (mesh units) so opposing trucks pass each other. */ laneOffset: 0.02 },
-  excavators: { count: 4, scale: 0.32, cycleSeconds: 7, paint: [0.93, 0.70, 0.12] as [number, number, number] },
+  excavators: { count: 4, scale: 0.42, cycleSeconds: 7, paint: [0.93, 0.70, 0.12] as [number, number, number] },
   drills: { count: 2, scale: 0.42, paint: [0.86, 0.86, 0.84] as [number, number, number] },
   /** Pulsing beacons on machines (brand green). */
   beacon: [0.55, 0.78, 0.25] as [number, number, number],
+  shadow: { size: 2048, extent: 1.35, /** Refresh the sun's depth map every N frames. */ everyFrames: 2 },
+  /** Time of day follows the descent: first entry at the rim, second on the pit floor. */
+  timeOfDay: {
+    sun: [[0.74, 0.40, 0.42], [0.25, 0.92, 0.20]] as [number, number, number][],
+    sunCol: [[1.28, 0.96, 0.70], [1.12, 1.07, 0.98]] as [number, number, number][],
+    top: [[0.34, 0.44, 0.60], [0.36, 0.55, 0.78]] as [number, number, number][],
+    horizon: [[0.97, 0.73, 0.52], [0.87, 0.87, 0.83]] as [number, number, number][],
+    fog: [[0.86, 0.69, 0.52], [0.82, 0.80, 0.74]] as [number, number, number][],
+  },
+  /**
+   * Scripted event on a stage. GRN advertises blasting-free excavation, so this is a rock slide:
+   * flash 0. Set flash to about 1.2 and shake to about 0.012 to turn it into a controlled blast.
+   */
+  event: { stage: 1, delay: 0.2, flash: 0, shake: 0.004, debris: 150, plume: 130, debrisSpeed: 0.42, plumeRise: 0.34, size: 26 },
+  /** One truck reverses to the first excavator, takes three buckets, drives off. Multiples of cycleSeconds. */
+  loading: { approach: 7, wait: 21, leave: 7, buckets: 3, travelRad: 1.05, rocks: 6 },
+  /** Hold and drag to look around; eases back after release. */
+  look: { sensitivity: 0.0042, maxYaw: 1.25, maxPitch: 0.5, follow: 0.1, returnAfter: 2.5 },
+  callout: { radiusPx: 46 },
   /** Intro fly-in when the preloader lifts: from a high, distant vantage into the aerial stage. */
   intro: { from: [0.7, 2.4, 3.1] as [number, number, number], duration: 3.2 },
   /** Fraction of a stage the scroll must pass a boundary by before the headline changes. */

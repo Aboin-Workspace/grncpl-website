@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { m } from 'motion/react'
-import { Box, Camera, Cylinder, Geometry, Mesh, Program, Renderer, Sphere, Transform, Triangle } from 'ogl'
+import { Box, Camera, Cylinder, Geometry, Mesh, Program, Renderer, RenderTarget, Shadow, Sphere, Transform, Triangle, Vec3 } from 'ogl'
 import { gsap, useGSAP, ScrollTrigger } from '@/lib/gsap'
 import { getLenis } from '@/lib/lenis'
 import { benchPoint, roadPoint, spline } from '@/lib/pit'
@@ -9,7 +9,12 @@ import { onIdle } from '@/lib/idle'
 import { HERO, TERRAIN, WORLD } from '@/config/motion'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
 import type { HeroSlide } from '@/data/home'
-import { HERO_CTAS } from '@/data/home'
+import { HERO_CTAS, STATS } from '@/data/home'
+import { EQUIPMENT, EQUIPMENT_OTHERS } from '@/data/equipment'
+import { MineAudio } from '@/lib/mineAudio'
+import depthFrag from '@/lib/shaders/depth.frag.glsl?raw'
+import blastVert from '@/lib/shaders/blast.vert.glsl?raw'
+import blastFrag from '@/lib/shaders/blast.frag.glsl?raw'
 import { HeroHeadline, type HeroHeadlineHandle } from './HeroHeadline'
 import { StageRail } from './StageRail'
 import { ScrollCue } from './ScrollCue'
@@ -22,6 +27,17 @@ import skyVert from '@/lib/shaders/hero.vert.glsl?raw'
 import skyFrag from '@/lib/shaders/sky.frag.glsl?raw'
 import dustVert from '@/lib/shaders/dust.vert.glsl?raw'
 import dustFrag from '@/lib/shaders/dust.frag.glsl?raw'
+
+const fleetCount = (id: string) => EQUIPMENT.find((c) => c.id === id)?.rows.reduce((a, r) => a + r.numbers, 0) ?? 0
+const CALLOUT = {
+  truck: { title: 'Dumpers/Trucks', detail: `${fleetCount('dumpers-trucks')} in the fleet` },
+  excavator: { title: 'Excavators', detail: `${fleetCount('excavators')} in the fleet` },
+  cart: { title: EQUIPMENT_OTHERS.items[1].title, detail: `${EQUIPMENT_OTHERS.items[1].count} in the fleet` },
+  worker: { title: STATS[1].label, detail: `${STATS[1].value}${STATS[1].suffix}` },
+}
+const MAP_SCALE = 44
+const mapPoint = (tc: number) => { const q = roadPoint(tc); return [50 + q.x * MAP_SCALE, 50 + q.z * MAP_SCALE] as const }
+const mix3 = (a: readonly number[], b: readonly number[], k: number) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k]
 
 interface Props {
   slides: HeroSlide[]
@@ -45,6 +61,18 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
   const headline = useRef<HeroHeadlineHandle>(null)
   const particles = useRef<ParticleFieldHandle>(null)
   const progress = useRef(0)
+  const tag = useRef<HTMLDivElement>(null)
+  const marker = useRef<SVGCircleElement>(null)
+  const audio = useRef<MineAudio | null>(null)
+  const [sound, setSound] = useState(false)
+  const toggleSound = () => {
+    if (sound) { audio.current?.stop(); audio.current = null; setSound(false); return }
+    audio.current = new MineAudio()
+    audio.current.start()
+    setSound(true)
+  }
+  useEffect(() => () => audio.current?.stop(), [])
+  const mapPath = useMemo(() => Array.from({ length: 121 }, (_, i) => { const [x, y] = mapPoint((i / 120) * TERRAIN.pit.benches); return `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}` }).join(' '), [])
   const startedRef = useRef(started)
   const introRef = useRef<{ t: number } | null>(null)
   useEffect(() => {
@@ -85,6 +113,11 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
       const tick = () => {
         const p = progress.current * n
         bars?.forEach((b, i) => b.style.setProperty('--p', String(Math.max(0, Math.min(1, p - i)))))
+        if (marker.current) {
+          const [mx, my] = mapPoint(progress.current * TERRAIN.pit.benches * 0.92)
+          marker.current.setAttribute('cx', mx.toFixed(1))
+          marker.current.setAttribute('cy', my.toFixed(1))
+        }
       }
       gsap.ticker.add(tick)
       return () => gsap.ticker.remove(tick)
@@ -131,7 +164,16 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
     Object.assign(gl.canvas.style, { width: '100%', height: '100%', display: 'block' })
     const camera = new Camera(gl, { fov: W.camera.fov, near: W.camera.near, far: W.camera.far })
     const scene = new Transform()
+    gl.clearColor(1, 1, 1, 1) // shadow map clears to "far"; the sky pass repaints the colour buffer
+    const light = new Camera(gl, { left: -W.shadow.extent, right: W.shadow.extent, bottom: -W.shadow.extent, top: W.shadow.extent, near: 0.1, far: 7 })
+    const shadow = new Shadow(gl, { light, width: W.shadow.size })
+    shadow.target = new RenderTarget(gl, { width: W.shadow.size, height: W.shadow.size, minFilter: gl.NEAREST, magFilter: gl.NEAREST })
+    shadow.targetUniform.value = shadow.target.texture
     const shared = {
+      uSunCol: { value: [1, 1, 1] },
+      shadowProjectionMatrix: { value: light.projectionMatrix },
+      shadowViewMatrix: { value: light.viewMatrix },
+      tShadow: shadow.targetUniform,
       uSun: { value: [...W.sun] },
       uFog: { value: [...W.fog.color] },
       uFogDensity: { value: W.fog.density },
@@ -178,6 +220,7 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
         uniforms: {
           ...shared,
           uTime: { value: 0 },
+          uFlash: { value: 0 }, uFlashPos: { value: [0, 0, 0] }, uCartTc: { value: 0 },
           uPitRadius: { value: T.pit.radius }, uBenches: { value: T.pit.benches }, uBenchWidth: { value: T.pit.benchWidth }, uBenchDepth: { value: T.pit.benchDepth }, uRamp: { value: W.ramp },
           uRoadWidth: { value: T.road.width }, uRoadTurns: { value: T.road.turns },
           uNoiseAmp: { value: W.relief.amplitude }, uNoiseFreq: { value: W.relief.frequency }, uInner: { value: W.relief.inner },
@@ -186,6 +229,7 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
       }),
     })
     terrain.setParent(scene)
+    ;(terrain as unknown as { depthProgram: Program }).depthProgram = new Program(gl, { vertex: worldVert, fragment: depthFrag, cullFace: null, uniforms: terrain.program.uniforms })
 
     // Trucks: low-poly rigid dumpers (chassis, flared tipper, cab, six wheels, exhaust, ground shadow)
     const mkProg = (c: readonly [number, number, number]) => new Program(gl, { vertex: propVert, fragment: propFrag, uniforms: { ...shared, uColor: { value: [...c] } } })
@@ -214,9 +258,7 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
     const wheelGeo = new Cylinder(gl, { radiusTop: 0.012, radiusBottom: 0.012, height: 0.011, radialSegments: 12 })
     const hubGeo = new Cylinder(gl, { radiusTop: 0.006, radiusBottom: 0.006, height: 0.012, radialSegments: 8 })
     const stackGeo = new Cylinder(gl, { radiusTop: 0.002, radiusBottom: 0.002, height: 0.018, radialSegments: 6 })
-    const shadowGeo = new Cylinder(gl, { radiusTop: 0.052, radiusBottom: 0.052, height: 0.001, radialSegments: 18 })
-    const trucks: { node: Transform; offset: number; dir: number; wheels: Mesh[]; lane: number }[] = []
-    const shadowMat = new Program(gl, { vertex: propVert, fragment: `#version 300 es\nprecision highp float; in vec3 vWorld; out vec4 o; void main(){ o = vec4(0.0,0.0,0.0,0.45); }`, transparent: true, depthWrite: false })
+    const trucks: { node: Transform; offset: number; dir: number; wheels: Mesh[]; lane: number; cart: boolean }[] = []
     const emissive = new Program(gl, { vertex: propVert, fragment: `#version 300 es\nprecision highp float; uniform vec3 uColor; uniform float uPulse; in vec3 vWorld; out vec4 o; void main(){ o = vec4(uColor * (0.6 + 0.9 * uPulse), 1.0); }`, uniforms: { uColor: { value: [...W.beacon] }, uPulse: { value: 1 } } })
     const lampGeo = new Sphere(gl, { radius: 0.003, widthSegments: 8, heightSegments: 6 })
     const headlampGeo = new Box(gl, { width: 0.003, height: 0.005, depth: 0.006 })
@@ -228,16 +270,21 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
     const place = (node: Transform, geo: Geometry, prog: Program, x: number, y: number, z: number, rx = 0, rz = 0, ry = 0) => {
       const mesh = new Mesh(gl, { geometry: geo, program: prog }); mesh.position.set(x, y, z); mesh.rotation.set(rx, ry, rz); mesh.setParent(node); return mesh
     }
-    for (let i = 0; i < W.trucks.count; i++) {
+    const tank = mkProg([0.84, 0.86, 0.86])
+    const tankGeo = new Cylinder(gl, { radiusTop: 0.024, radiusBottom: 0.024, height: 0.07, radialSegments: 14 })
+    const buildTruck = (cart: boolean) => {
       const node = new Transform()
       node.scale.set(W.trucks.scale, W.trucks.scale, W.trucks.scale)
       const add = (geo: Geometry, prog: Program, x: number, y: number, z: number, rx = 0, rz = 0) => place(node, geo, prog, x, y, z, rx, rz)
-      add(shadowGeo, shadowMat, 0, 0.0008, 0)
       add(chassisGeo, dark, 0, 0.02, 0)
       add(deckGeo, steel, -0.01, 0.03, 0)
-      const tip = add(tipperGeo, paint, -0.012, 0.034, 0); tip.rotation.z = 0.04
-      add(tipperInnerGeo, paintDark, -0.012, 0.064, 0)
-      for (const rx of [-0.03, -0.012, 0.006]) add(ribGeo, paintDark, rx, 0.05, 0)
+      if (cart) {
+        add(tankGeo, tank, -0.012, 0.056, 0, 0, Math.PI / 2)
+      } else {
+        const tip = add(tipperGeo, paint, -0.012, 0.034, 0); tip.rotation.z = 0.04
+        add(tipperInnerGeo, paintDark, -0.012, 0.064, 0)
+        for (const rx of [-0.03, -0.012, 0.006]) add(ribGeo, paintDark, rx, 0.05, 0)
+      }
       add(cabGeo, paint, 0.03, 0.046, -0.008)
       add(cabGlassGeo, glass, 0.041, 0.05, -0.008)
       add(grilleGeo, dark, 0.047, 0.03, 0)
@@ -253,9 +300,14 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
         add(hubGeo, steel, x, 0.012, z, Math.PI / 2)
       }
       node.setParent(scene)
-      const dir = i % 2 === 0 ? 1 : -1
-      trucks.push({ node, offset: (i / W.trucks.count) * (T.pit.benches - 0.3) + 0.15, dir, wheels, lane: dir * W.trucks.laneOffset })
+      return { node, wheels }
     }
+    for (let i = 0; i < W.trucks.count; i++) {
+      const dir = i % 2 === 0 ? 1 : -1
+      trucks.push({ ...buildTruck(false), offset: (i / W.trucks.count) * (T.pit.benches - 0.3) + 0.15, dir, lane: dir * W.trucks.laneOffset, cart: false })
+    }
+    // Water cart: same lane and speed as the down-road trucks, spaced between two of them.
+    trucks.push({ ...buildTruck(true), offset: (1 / W.trucks.count) * (T.pit.benches - 0.3) + 0.15, dir: 1, lane: W.trucks.laneOffset, cart: true })
 
     // Excavators: tracked base, slewing house, boom → stick → bucket on nested pivots, digging the toe of a batter.
     const X = W.excavators
@@ -270,11 +322,11 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
     const stickGeo = new Box(gl, { width: 0.08, height: 0.012, depth: 0.011 })
     const bucketGeo = new Box(gl, { width: 0.028, height: 0.024, depth: 0.03 })
     const cylGeo = new Cylinder(gl, { radiusTop: 0.003, radiusBottom: 0.003, height: 0.06, radialSegments: 6 })
-    const excavators: { house: Transform; boom: Transform; stick: Transform; bucket: Transform; phase: number; base: number }[] = []
+    const excavators: { root: Transform; ang: number; house: Transform; boom: Transform; stick: Transform; bucket: Transform; phase: number; base: number }[] = []
     for (let i = 0; i < X.count; i++) {
       const bench = 1 + i // benches 1..4
       const ang = (i / X.count) * Math.PI * 2 + 1.1 + bench * 0.9 // staggered, away from the road entry
-      const pt = benchPoint(bench, 0.5, ang)
+      const pt = benchPoint(bench, 0.3, ang)
       const root = new Transform(); root.position.set(pt.x, pt.y + 0.002, pt.z); root.scale.set(X.scale, X.scale, X.scale)
       const facing = ang + Math.PI // face the inner batter (toward the pit centre)
       root.rotation.y = -facing
@@ -294,7 +346,7 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
       const bucket = new Transform(); bucket.position.set(0.058, -0.06, 0); bucket.setParent(stick)
       place(bucket, bucketGeo, dark, 0.008, -0.012, 0)
       root.setParent(scene)
-      excavators.push({ house, boom, stick, bucket, phase: i * 1.7, base: -facing })
+      excavators.push({ root, ang, house, boom, stick, bucket, phase: i * 1.7, base: -facing })
     }
 
     // Drill rigs: tracked base with a tall mast; the drill string plunges and dust puffs at the bit.
@@ -325,7 +377,7 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
       const pile = new Mesh(gl, { geometry: pileGeo, program: pileMat })
       const bench = 1 + i
       const ang = (i / X.count) * Math.PI * 2 + 1.1 + bench * 0.9 + 0.22
-      const pt = benchPoint(bench, 0.5, ang)
+      const pt = benchPoint(bench, 0.3, ang)
       pile.position.set(pt.x, pt.y + 0.006, pt.z); pile.scale.set(X.scale * 1.6, X.scale * 1.6, X.scale * 1.6)
       pile.setParent(scene)
       void ex
@@ -362,7 +414,7 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
     })
 
     // Dust trails: a pool of puffs re-spawned at the rear of each truck.
-    const TN = W.trucks.count * W.trucks.trailPuffs
+    const TN = (W.trucks.count + 1) * W.trucks.trailPuffs
     const tpos = new Float32Array(TN * 3)
     const tseed = new Float32Array(TN)
     const tlife = new Float32Array(TN)
@@ -388,6 +440,61 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
     const dust = new Mesh(gl, { geometry: new Geometry(gl, { position: { size: 3, data: dpos }, seed: { size: 1, data: dseed } }), program: dustProg, mode: gl.POINTS })
     dust.setParent(scene)
 
+    // Loading cycle: one truck reverses along the bench to the first excavator.
+    const L = W.loading
+    const loaderEx = excavators[0]
+    const loaderBench = 1
+    const loader = buildTruck(false)
+    const heapGeo = new Box(gl, { width: 0.05, height: 0.02, depth: 0.04 })
+    const heap = new Mesh(gl, { geometry: heapGeo, program: mkProg([0.2, 0.18, 0.17]) })
+    heap.position.set(-0.012, 0.064, 0); heap.setParent(loader.node)
+    const rockGeo = new Box(gl, { width: 0.006, height: 0.005, depth: 0.006 })
+    const rockMat = mkProg([0.24, 0.21, 0.19])
+    const rocks = Array.from({ length: L.rocks }, (_, i) => { const r = new Mesh(gl, { geometry: rockGeo, program: rockMat }); r.setParent(scene); r.visible = false; return { r, seed: i / L.rocks } })
+    const loadPeriod = L.approach + L.wait + L.leave
+
+    // Scripted event: rock and dust thrown off a wall the camera is facing.
+    const E2 = W.event
+    const EN = E2.debris + E2.plume
+    const evVel = new Float32Array(EN * 3)
+    const evSeed = new Float32Array(EN * 2)
+    for (let i = 0; i < EN; i++) {
+      const plume = i >= E2.debris
+      const a = Math.random() * Math.PI * 2
+      const sp = (plume ? 0.1 : E2.debrisSpeed) * (0.35 + Math.random() * 0.75)
+      evVel[i * 3] = Math.cos(a) * sp
+      evVel[i * 3 + 1] = plume ? E2.plumeRise * (0.25 + Math.random()) : E2.debrisSpeed * (0.5 + Math.random())
+      evVel[i * 3 + 2] = Math.sin(a) * sp
+      evSeed[i * 2] = Math.random()
+      evSeed[i * 2 + 1] = plume ? 1 : 0
+    }
+    const evProg = new Program(gl, { vertex: blastVert, fragment: blastFrag, transparent: true, depthWrite: false, uniforms: { uOrigin: { value: [0, 0, 0] }, uT: { value: 0 }, uSize: { value: E2.size * renderer.dpr } } })
+    evProg.setBlendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
+    const evMesh = new Mesh(gl, { geometry: new Geometry(gl, { position: { size: 3, data: evVel }, seed: { size: 2, data: evSeed } }), program: evProg, mode: gl.POINTS, frustumCulled: false })
+    evMesh.visible = false
+    evMesh.setParent(scene)
+    let eventStart = -1
+    let eventArmed = true
+
+    // Everything solid casts into the sun's depth map; dust and the event plume do not.
+    scene.traverse((node) => {
+      const mesh = node as Mesh
+      if (!mesh.draw || mesh === dust || mesh === trail || mesh === evMesh) return
+      shadow.add({ mesh, receive: false })
+    })
+
+    // Hover callouts: machines and crews, with figures from the Equipments and home data.
+    const callouts: { node: Transform; info: { title: string; detail: string } }[] = [
+      ...trucks.map((tr) => ({ node: tr.node, info: tr.cart ? CALLOUT.cart : CALLOUT.truck })),
+      { node: loader.node, info: CALLOUT.truck },
+      ...excavators.map((ex) => ({ node: ex.root, info: CALLOUT.excavator })),
+      ...workers.map((wk) => ({ node: wk.node, info: CALLOUT.worker })),
+    ]
+    const v3 = new Vec3()
+    const titleEl = tag.current?.querySelector<HTMLElement>('[data-title]')
+    const detailEl = tag.current?.querySelector<HTMLElement>('[data-detail]')
+    let shownCallout: unknown = null
+
     // Camera path: aerial establishing shot → onto the road → down to the floor.
     const rp = (tc: number, lift: number): [number, number, number] => { const q = roadPoint(tc); return [q.x * 1.06, q.y + lift, q.z * 1.06] }
     const posKeys: [number, number, number][] = [[0.0, 1.25, 2.1], rp(0.25, 0.38), rp(1.4, 0.16), rp(2.8, 0.11), rp(4.0, 0.1), rp(4.5, 0.22)]
@@ -396,13 +503,29 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
     const lookKeys: [number, number, number][] = [[0, -0.25, 0], [0, -0.3, 0], ahead(2.2), ahead(3.6), ahead(4.7), [far.x * 0.15, -T.pit.benches * T.pit.benchDepth - 0.02, far.z * 0.15]]
 
     const ptr = { x: 0, y: 0, tx: 0, ty: 0 }
+    const mouse = { x: 0, y: 0, on: false }
+    const free = { yaw: 0, pitch: 0, tYaw: 0, tPitch: 0, drag: false, released: 0 }
     const onMove = (e: PointerEvent) => {
       if (e.pointerType !== 'mouse') return
       const r = target.getBoundingClientRect()
       ptr.tx = ((e.clientX - r.left) / r.width - 0.5) * 2
       ptr.ty = ((e.clientY - r.top) / r.height - 0.5) * 2
+      mouse.x = e.clientX - r.left
+      mouse.y = e.clientY - r.top
+      mouse.on = true
+      if (free.drag) {
+        free.tYaw = Math.max(-W.look.maxYaw, Math.min(W.look.maxYaw, free.tYaw - e.movementX * W.look.sensitivity))
+        free.tPitch = Math.max(-W.look.maxPitch, Math.min(W.look.maxPitch, free.tPitch - e.movementY * W.look.sensitivity))
+      }
     }
-    const onLeave = () => { ptr.tx = 0; ptr.ty = 0 }
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType !== 'mouse' || (e.target as Element).closest('a, button')) return
+      free.drag = true
+    }
+    const onUp = () => { if (free.drag) { free.drag = false; free.released = performance.now() } }
+    const onLeave = () => { ptr.tx = 0; ptr.ty = 0; mouse.on = false }
+    target.addEventListener('pointerdown', onDown)
+    window.addEventListener('pointerup', onUp)
     target.addEventListener('pointermove', onMove, { passive: true })
     target.addEventListener('pointerleave', onLeave)
 
@@ -422,6 +545,7 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
     const introState = { t: startedRef.current ? 1 : 0 }
     introRef.current = introState
     let lastT = 0
+    let frameNo = 0
     const draw = (t: number) => {
       const dt = Math.min(0.05, t - lastT); lastT = t
       const p = progress.current
@@ -451,6 +575,50 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
       look[0] += rx * ptr.x * W.pointer.yaw
       look[2] += rz * ptr.x * W.pointer.yaw
       look[1] -= ptr.y * W.pointer.pitch
+      // free look: rotate the view vector around the camera
+      if (!free.drag && performance.now() - free.released > W.look.returnAfter * 1000) { free.tYaw = 0; free.tPitch = 0 }
+      free.yaw += (free.tYaw - free.yaw) * W.look.follow
+      free.pitch += (free.tPitch - free.pitch) * W.look.follow
+      if (Math.abs(free.yaw) + Math.abs(free.pitch) > 0.001) {
+        const dx = look[0] - pos[0], dz = look[2] - pos[2]
+        const c = Math.cos(free.yaw), sn = Math.sin(free.yaw)
+        look[0] = pos[0] + dx * c - dz * sn
+        look[2] = pos[2] + dx * sn + dz * c
+        look[1] += Math.hypot(dx, dz) * Math.tan(free.pitch)
+      }
+      // time of day follows the descent
+      const D0 = W.timeOfDay
+      const day = Math.max(0, Math.min(1, smooth))
+      shared.uSun.value = mix3(D0.sun[0], D0.sun[1], day)
+      shared.uSunCol.value = mix3(D0.sunCol[0], D0.sunCol[1], day)
+      shared.uFog.value = mix3(D0.fog[0], D0.fog[1], day)
+      sky.program.uniforms.uTop.value = mix3(D0.top[0], D0.top[1], day)
+      sky.program.uniforms.uHorizon.value = mix3(D0.horizon[0], D0.horizon[1], day)
+      const sunV = shared.uSun.value
+      const sunLen = Math.hypot(sunV[0], sunV[1], sunV[2])
+      light.position.set((sunV[0] / sunLen) * 3.2, (sunV[1] / sunLen) * 3.2, (sunV[2] / sunLen) * 3.2)
+      light.lookAt([0, -0.2, 0])
+
+      // scripted event
+      const evAt = (E2.stage + E2.delay) / n
+      if (eventArmed && smooth > evAt && smooth < (E2.stage + 1) / n) {
+        eventArmed = false
+        eventStart = t
+        const hx = pos[0] + (look[0] - pos[0]) * 0.8, hz = pos[2] + (look[2] - pos[2]) * 0.8
+        const q = benchPoint(1, 0.75, Math.atan2(hz, hx))
+        evProg.uniforms.uOrigin.value = [q.x, q.y + 0.01, q.z]
+        terrain.program.uniforms.uFlashPos.value = [q.x, q.y + 0.04, q.z]
+        audio.current?.rumble()
+      }
+      if (smooth < E2.stage / n - 0.02 || smooth > (E2.stage + 1) / n + 0.02) eventArmed = true
+      const evT = eventStart < 0 ? 99 : t - eventStart
+      evMesh.visible = evT < 9
+      evProg.uniforms.uT.value = evT
+      terrain.program.uniforms.uFlash.value = E2.flash * Math.exp(-evT * 5)
+      if (evT < 3) {
+        const sh = E2.shake * Math.exp(-evT * 2.5)
+        pos[0] += (Math.random() - 0.5) * sh; pos[1] += (Math.random() - 0.5) * sh; pos[2] += (Math.random() - 0.5) * sh
+      }
       pos[1] += Math.sin(t * F.swayHz * Math.PI * 2) * F.swayAmp
       camera.position.set(pos[0], pos[1], pos[2])
       camera.lookAt(look)
@@ -466,6 +634,11 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
         const a = roadPoint(tc, tr.lane), b = roadPoint(tc + 0.02 * tr.dir, tr.lane)
         tr.node.position.set(a.x, a.y + 0.004, a.z)
         tr.node.rotation.y = Math.atan2(-(b.z - a.z), b.x - a.x)
+        // shrink away at the two ends of the road instead of popping
+        const edge = Math.min(tc - 0.15, 0.15 + span - tc)
+        const es = W.trucks.scale * Math.max(0, Math.min(1, edge / 0.2))
+        tr.node.scale.set(es, es, es)
+        if (tr.cart) terrain.program.uniforms.uCartTc.value = tc
         tr.wheels.forEach((wh) => { wh.rotation.y = t * 6 * tr.dir })
         // trail: puffs drift up/back and die; respawn behind the rear axle
         const dirx = Math.cos(tr.node.rotation.y), dirz = -Math.sin(tr.node.rotation.y)
@@ -488,21 +661,72 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
       trailProg.uniforms.uTime.value = t
       // machines
       emissive.uniforms.uPulse.value = 0.5 + 0.5 * Math.sin(t * 4.0)
-      excavators.forEach((ex) => {
+      // loading cycle
+      const lm = t % loadPeriod
+      const easeL = (v: number) => v * v * (3 - 2 * v)
+      const away = lm < L.approach ? 1 - easeL(lm / L.approach) : lm > L.approach + L.wait ? easeL((lm - L.approach - L.wait) / L.leave) : 0
+      const reachR = Math.hypot(loaderEx.root.position.x, loaderEx.root.position.z)
+      const reach = 0.17 * X.scale
+      const la = loaderEx.ang + reach / reachR + away * L.travelRad
+      const lp = benchPoint(loaderBench, 0.2, la)
+      loader.node.position.set(lp.x, lp.y + 0.004, lp.z)
+      loader.node.rotation.y = -(la + Math.PI / 2)
+      const ls = W.trucks.scale * Math.max(0, Math.min(1, (1 - away) / 0.15))
+      loader.node.scale.set(ls, ls, ls)
+      loader.wheels.forEach((wh) => { wh.rotation.y = away > 0 && away < 1 ? t * (lm < L.approach ? -6 : 6) : 0 })
+      audio.current?.setReversing(lm < L.approach)
+      const dumpOffset = X.cycleSeconds * 0.75
+      const dumped = lm < L.approach ? 0 : Math.max(0, Math.min(L.buckets, Math.floor((lm - L.approach - dumpOffset) / X.cycleSeconds) + 1))
+      heap.visible = dumped > 0
+      heap.scale.set(1, dumped / L.buckets, 1)
+      const cyc = (t % X.cycleSeconds) / X.cycleSeconds
+      const falling = lm >= L.approach && lm <= L.approach + L.wait && cyc > 0.68 && cyc < 0.8
+      rocks.forEach(({ r, seed }) => {
+        r.visible = falling
+        if (!falling) return
+        const f = (cyc - 0.68) / 0.12
+        const ang2 = seed * Math.PI * 2
+        r.position.set(lp.x + Math.cos(ang2) * 0.008, lp.y + 0.075 - 0.04 * f * f, lp.z + Math.sin(ang2) * 0.008)
+      })
+      excavators.forEach((ex, exi) => {
         const c = ((t + ex.phase) % X.cycleSeconds) / X.cycleSeconds // 0..1 dig cycle
         const dig = c < 0.45 ? c / 0.45 : 0                         // digging (down + curl)
         const swing = c >= 0.45 && c < 0.75 ? (c - 0.45) / 0.3 : 0   // swing to dump
         const back = c >= 0.75 ? (c - 0.75) / 0.25 : 0               // swing back
         const ease = (v: number) => v * v * (3 - 2 * v)
         const slew = swing ? ease(swing) : back ? 1 - ease(back) : 0
-        ex.house.rotation.y = slew * 1.1
+        ex.house.rotation.y = slew * (exi === 0 ? Math.PI / 2 : 1.1)
         const bite = Math.sin(ease(dig) * Math.PI)
-        ex.boom.rotation.z = -0.15 - bite * 0.35 + slew * 0.25
+        ex.boom.rotation.z = -0.15 - bite * 0.35 + slew * (exi === 0 ? 0.55 : 0.25)
         ex.stick.rotation.z = 0.2 + bite * 0.9 - slew * 0.3
         ex.bucket.rotation.z = -0.3 + bite * 1.2 - slew * 0.9
       })
       workers.forEach((wk) => { wk.node.rotation.y = wk.base + Math.sin(t * 0.6 + wk.phase) * 0.35; wk.node.position.y += 0 })
       drills.forEach((d) => { d.string.position.y = 0.06 - 0.035 * (0.5 + 0.5 * Math.sin(t * 1.3 + d.phase)) })
+      // callout under the mouse
+      const tagEl = tag.current
+      if (tagEl) {
+        let best: (typeof callouts)[number] | null = null
+        let bx = 0, by = 0, bd: number = W.callout.radiusPx
+        if (mouse.on && !free.drag) {
+          for (const c of callouts) {
+            if (c.node.scale.x < 0.05) continue
+            const m = c.node.worldMatrix
+            v3.set(m[12], m[13], m[14]).applyMatrix4(camera.viewMatrix)
+            if (v3.z > 0) continue
+            v3.applyMatrix4(camera.projectionMatrix)
+            const sx = (v3.x * 0.5 + 0.5) * el.clientWidth, sy = (0.5 - v3.y * 0.5) * el.clientHeight
+            const d = Math.hypot(sx - mouse.x, sy - mouse.y)
+            if (d < bd) { bd = d; best = c; bx = sx; by = sy }
+          }
+        }
+        tagEl.style.opacity = best ? '1' : '0'
+        if (best) {
+          tagEl.style.transform = `translate(${bx + 18}px, ${by - 44}px)`
+          if (shownCallout !== best.info && titleEl && detailEl) { titleEl.textContent = best.info.title; detailEl.textContent = best.info.detail; shownCallout = best.info }
+        }
+      }
+      if (frameNo++ % W.shadow.everyFrames === 0) shadow.render({ scene })
       renderer.render({ scene: sky, camera, clear: true })
       renderer.render({ scene, camera, clear: false })
     }
@@ -514,7 +738,7 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
       if (!visible || document.hidden) return
       draw((performance.now() - t0) / 1000)
     }
-    const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting }, { threshold: 0.01 })
+    const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; audio.current?.setActive(e.isIntersecting) }, { threshold: 0.01 })
     io.observe(target)
     if (reduced) draw(0)
     else raf = requestAnimationFrame(loop)
@@ -525,10 +749,12 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
       ro.disconnect()
       target.removeEventListener('pointermove', onMove)
       target.removeEventListener('pointerleave', onLeave)
+      target.removeEventListener('pointerdown', onDown)
+      window.removeEventListener('pointerup', onUp)
       el.removeChild(gl.canvas)
       gl.getExtension('WEBGL_lose_context')?.loseContext()
     }
-  }, [reduced])
+  }, [reduced, n])
 
   return (
     <section
@@ -536,6 +762,7 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
       className="theme-dark relative h-[100svh] min-h-[600px] w-full overflow-hidden bg-ink"
       aria-roledescription="carousel"
       aria-label="GRN Constructions highlights"
+      data-cursor={index === n - 1 ? 'Drag' : undefined}
     >
       <div ref={host} className="absolute inset-0" aria-hidden="true" />
       <div className="pointer-events-none absolute inset-0 bg-scrim" aria-hidden="true" />
@@ -562,7 +789,21 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
       <m.div className="absolute inset-0 z-20" initial={false} animate={{ opacity: started ? 1 : 0 }} transition={{ duration: reduced ? 0 : 1.2, delay: started && !reduced ? 1.6 : 0, ease: [0.16, 1, 0.3, 1] }} style={{ pointerEvents: started ? undefined : 'none' }}>
         <StageRail ref={chrome} slides={slides} index={index} onSelect={scrollToStage} onPrev={() => scrollToStage(Math.max(0, index - 1))} onNext={() => scrollToStage(Math.min(n - 1, index + 1))} />
         {!reduced && <ScrollCue />}
+        {/* Depth map: the haul-road spiral with four stage ticks and your position */}
+        <svg viewBox="0 0 100 100" className="pointer-events-none absolute right-gutter top-[9.25rem] h-24 w-24" aria-hidden="true">
+          <circle cx="50" cy="50" r="48" fill="rgb(11 11 12 / 0.45)" stroke="rgb(var(--c-bone) / 0.2)" />
+          <path d={mapPath} fill="none" stroke="rgb(var(--c-bone) / 0.55)" strokeWidth="1.2" />
+          {slides.map((_, i) => { const [x, y] = mapPoint((i / n) * TERRAIN.pit.benches * 0.92); return <circle key={i} cx={x} cy={y} r="2" fill="rgb(var(--c-bone))" /> })}
+          <circle ref={marker} r="3.4" fill="rgb(var(--c-amber))" />
+        </svg>
+        <button type="button" onClick={toggleSound} aria-pressed={sound} aria-label={sound ? 'Turn site sound off' : 'Turn site sound on'} data-cursor-grow className="pointer-events-auto absolute right-gutter top-[16.25rem] flex h-10 w-24 items-center justify-center gap-2 border border-bone/25 bg-ink/40 font-body text-[10px] uppercase text-bone/80 backdrop-blur-sm hud-mono transition-colors duration-fast hover:border-amber hover:text-amber">
+          {sound ? 'Sound on' : 'Sound off'}
+        </button>
       </m.div>
+      <div ref={tag} className="pointer-events-none absolute left-0 top-0 z-[19] border border-amber/70 bg-ink/80 px-3 py-2 opacity-0 backdrop-blur-sm transition-opacity duration-fast" aria-hidden="true">
+        <p data-title className="font-display text-lg uppercase leading-none text-bone" />
+        <p data-detail className="mt-1 font-body text-[10px] uppercase text-amber hud-mono" />
+      </div>
       <div className="sr-only" aria-live="polite" aria-atomic="true">Stage {index + 1} of {n}: {slides[index].title}</div>
     </section>
   )

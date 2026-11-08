@@ -37,7 +37,10 @@ export function Hero({ slides, subtext, started = true, forceFallback = false }:
   const n = slides.length
   const reduced = useReducedMotion()
   const webgl = useMemo(() => !forceFallback && hasWebGL(), [forceFallback])
-  const useCanvas = webgl && !reduced
+  // The still image paints first; WebGL starts once the page has settled, so it never blocks phone load.
+  const [canvasFrom, setCanvasFrom] = useState<number | null>(null)
+  const canvasWanted = webgl && !reduced
+  const useCanvas = canvasWanted && canvasFrom !== null
 
   const root = useRef<HTMLElement>(null)
   const canvas = useRef<HeroCanvasHandle>(null)
@@ -52,6 +55,14 @@ export function Hero({ slides, subtext, started = true, forceFallback = false }:
   const firstRender = useRef(true)
 
   const [index, setIndex] = useState(0)
+  const indexRef = useRef(0)
+  indexRef.current = index
+  useEffect(() => {
+    if (!canvasWanted || !started) return
+    let cancelIdle = () => {}
+    const id = window.setTimeout(() => { cancelIdle = onIdle(() => setCanvasFrom(indexRef.current)) }, HERO.canvasDelayMs)
+    return () => { window.clearTimeout(id); cancelIdle() }
+  }, [canvasWanted, started])
   const [paused, setPaused] = useState(false)
   // Off-screen (scrolled past) or hidden tab: autoplay waits.
   const [offscreen, setOffscreen] = useState(false)
@@ -209,7 +220,7 @@ export function Hero({ slides, subtext, started = true, forceFallback = false }:
     >
       {/* Layer 1 — image */}
       {useCanvas ? (
-        <HeroCanvas ref={canvas} slides={slides} initialIndex={0} pointerTarget={root} exitRef={exitState} />
+        <HeroCanvas ref={canvas} slides={slides} initialIndex={canvasFrom ?? 0} pointerTarget={root} exitRef={exitState} />
       ) : (
         <HeroFallback slides={slides} index={index} reduced={reduced} />
       )}
