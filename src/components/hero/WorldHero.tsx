@@ -97,6 +97,8 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
         scrub: WORLD.scrub,
         anticipatePin: 1,
         invalidateOnRefresh: true,
+        // This component loads after the sections below it, so it must be measured first.
+        refreshPriority: 10,
         onUpdate: (self) => {
           progress.current = self.progress
           // Hysteresis: a stage only changes once the scroll is clearly past the boundary.
@@ -108,6 +110,9 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
           })
         },
       })
+      // Sections below were measured before this pin existed: re-sort and re-measure them.
+      ScrollTrigger.sort()
+      ScrollTrigger.refresh()
       // Stage progress bars in the chrome
       const bars = chrome.current?.querySelectorAll<HTMLElement>('[data-progress-bar]')
       const tick = () => {
