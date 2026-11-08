@@ -64,8 +64,13 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
         invalidateOnRefresh: true,
         onUpdate: (self) => {
           progress.current = self.progress
-          const stage = Math.min(n - 1, Math.floor(self.progress * n))
-          setIndex((i) => (i === stage ? i : stage))
+          // Hysteresis: a stage only changes once the scroll is clearly past the boundary.
+          const p = self.progress * n
+          setIndex((i) => {
+            if (p > i + 1 + WORLD.stageHysteresis && i < n - 1) return Math.min(n - 1, Math.floor(p - WORLD.stageHysteresis))
+            if (p < i - WORLD.stageHysteresis && i > 0) return Math.max(0, Math.floor(p + WORLD.stageHysteresis))
+            return i
+          })
         },
       })
       // Stage progress bars in the chrome
@@ -175,27 +180,70 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
     })
     terrain.setParent(scene)
 
-    // Trucks: low-poly dumpers on the haul road
-    const paint = new Program(gl, { vertex: propVert, fragment: propFrag, uniforms: { ...shared, uColor: { value: [...W.trucks.paint] } } })
-    const dark = new Program(gl, { vertex: propVert, fragment: propFrag, uniforms: { ...shared, uColor: { value: [0.12, 0.12, 0.13] } } })
-    const glass = new Program(gl, { vertex: propVert, fragment: propFrag, uniforms: { ...shared, uColor: { value: [0.25, 0.30, 0.34] } } })
-    const bodyGeo = new Box(gl, { width: 0.085, height: 0.026, depth: 0.044 })
-    const tipperGeo = new Box(gl, { width: 0.056, height: 0.03, depth: 0.046 })
-    const cabGeo = new Box(gl, { width: 0.022, height: 0.03, depth: 0.04 })
-    const wheelGeo = new Cylinder(gl, { radiusTop: 0.013, radiusBottom: 0.013, height: 0.012, radialSegments: 10 })
-    const trucks: { node: Transform; offset: number; dir: number }[] = []
+    // Trucks: low-poly rigid dumpers (chassis, flared tipper, cab, six wheels, exhaust, ground shadow)
+    const mkProg = (c: readonly [number, number, number]) => new Program(gl, { vertex: propVert, fragment: propFrag, uniforms: { ...shared, uColor: { value: [...c] } } })
+    const paint = mkProg(W.trucks.paint)
+    const paintDark = mkProg([W.trucks.paint[0] * 0.75, W.trucks.paint[1] * 0.75, W.trucks.paint[2] * 0.6])
+    const dark = mkProg([0.10, 0.10, 0.11])
+    const steel = mkProg([0.38, 0.40, 0.42])
+    const glass = mkProg([0.22, 0.30, 0.36])
+    const chassisGeo = new Box(gl, { width: 0.09, height: 0.014, depth: 0.04 })
+    const deckGeo = new Box(gl, { width: 0.06, height: 0.012, depth: 0.05 })
+    // Flared tipper: a trapezoid prism (wider at the top) built by hand.
+    const tipperGeo = (() => {
+      const w0 = 0.028, w1 = 0.034, h = 0.034, d0 = 0.022, d1 = 0.028
+      const v = [
+        [-w0, 0, -d0], [w0, 0, -d0], [w0, 0, d0], [-w0, 0, d0],
+        [-w1, h, -d1], [w1, h, -d1], [w1, h, d1], [-w1, h, d1],
+      ]
+      const faces = [[0, 1, 2, 3], [4, 7, 6, 5], [0, 4, 5, 1], [1, 5, 6, 2], [2, 6, 7, 3], [3, 7, 4, 0]]
+      const pos: number[] = []
+      faces.forEach(([a, b, c, d]) => { for (const i of [a, b, c, a, c, d]) pos.push(...v[i]) })
+      return new Geometry(gl, { position: { size: 3, data: new Float32Array(pos) } })
+    })()
+    const tipperInnerGeo = new Box(gl, { width: 0.052, height: 0.006, depth: 0.044 })
+    const cabGeo = new Box(gl, { width: 0.02, height: 0.024, depth: 0.03 })
+    const cabGlassGeo = new Box(gl, { width: 0.006, height: 0.012, depth: 0.026 })
+    const wheelGeo = new Cylinder(gl, { radiusTop: 0.012, radiusBottom: 0.012, height: 0.011, radialSegments: 12 })
+    const hubGeo = new Cylinder(gl, { radiusTop: 0.006, radiusBottom: 0.006, height: 0.012, radialSegments: 8 })
+    const stackGeo = new Cylinder(gl, { radiusTop: 0.002, radiusBottom: 0.002, height: 0.018, radialSegments: 6 })
+    const shadowGeo = new Cylinder(gl, { radiusTop: 0.052, radiusBottom: 0.052, height: 0.001, radialSegments: 18 })
+    const shadowMat = new Program(gl, { vertex: propVert, fragment: `#version 300 es\nprecision highp float; in vec3 vWorld; out vec4 o; void main(){ o = vec4(0.0,0.0,0.0,0.45); }`, transparent: true, depthWrite: false })
+    const trucks: { node: Transform; offset: number; dir: number; wheels: Mesh[] }[] = []
     for (let i = 0; i < W.trucks.count; i++) {
       const node = new Transform()
       node.scale.set(W.trucks.scale, W.trucks.scale, W.trucks.scale)
-      const body = new Mesh(gl, { geometry: bodyGeo, program: paint }); body.position.set(0, 0.03, 0); body.setParent(node)
-      const tip = new Mesh(gl, { geometry: tipperGeo, program: paint }); tip.position.set(-0.016, 0.058, 0); tip.rotation.z = 0.05; tip.setParent(node)
-      const cab = new Mesh(gl, { geometry: cabGeo, program: glass }); cab.position.set(0.032, 0.058, 0); cab.setParent(node)
-      for (const [x, z] of [[0.03, 0.026], [0.03, -0.026], [-0.028, 0.026], [-0.028, -0.026]] as const) {
-        const wheel = new Mesh(gl, { geometry: wheelGeo, program: dark }); wheel.rotation.x = Math.PI / 2; wheel.position.set(x, 0.013, z); wheel.setParent(node)
+      const add = (geo: Geometry, prog: Program, x: number, y: number, z: number, rx = 0, rz = 0) => {
+        const mesh = new Mesh(gl, { geometry: geo, program: prog }); mesh.position.set(x, y, z); mesh.rotation.x = rx; mesh.rotation.z = rz; mesh.setParent(node); return mesh
+      }
+      add(shadowGeo, shadowMat, 0, 0.0008, 0)
+      add(chassisGeo, dark, 0, 0.02, 0)
+      add(deckGeo, steel, -0.01, 0.03, 0)
+      const tip = add(tipperGeo, paint, -0.012, 0.034, 0); tip.rotation.z = 0.04
+      add(tipperInnerGeo, paintDark, -0.012, 0.064, 0)
+      add(cabGeo, paint, 0.03, 0.046, -0.008)
+      add(cabGlassGeo, glass, 0.041, 0.05, -0.008)
+      add(stackGeo, dark, 0.024, 0.062, 0.012)
+      const wheels: Mesh[] = []
+      for (const [x, z] of [[0.03, 0.024], [0.03, -0.024], [-0.018, 0.026], [-0.018, -0.026], [-0.036, 0.026], [-0.036, -0.026]] as const) {
+        wheels.push(add(wheelGeo, dark, x, 0.012, z, Math.PI / 2))
+        add(hubGeo, steel, x, 0.012, z, Math.PI / 2)
       }
       node.setParent(scene)
-      trucks.push({ node, offset: (i / W.trucks.count) * (T.pit.benches - 0.3) + 0.15, dir: i % 2 === 0 ? 1 : -1 })
+      trucks.push({ node, offset: (i / W.trucks.count) * (T.pit.benches - 0.3) + 0.15, dir: i % 2 === 0 ? 1 : -1, wheels })
     }
+
+    // Dust trails: a pool of puffs re-spawned at the rear of each truck.
+    const TN = W.trucks.count * W.trucks.trailPuffs
+    const tpos = new Float32Array(TN * 3)
+    const tseed = new Float32Array(TN)
+    const tlife = new Float32Array(TN)
+    for (let i = 0; i < TN; i++) { tseed[i] = Math.random(); tlife[i] = Math.random() }
+    const trailGeo = new Geometry(gl, { position: { size: 3, data: tpos, usage: gl.DYNAMIC_DRAW }, seed: { size: 1, data: tseed } })
+    const trailProg = new Program(gl, { vertex: dustVert, fragment: dustFrag, transparent: true, depthWrite: false, uniforms: { uTime: { value: 0 }, uSize: { value: W.dust.size * renderer.dpr * 16 }, uAlpha: { value: W.trucks.trailAlpha } } })
+    trailProg.setBlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+    const trail = new Mesh(gl, { geometry: trailGeo, program: trailProg, mode: gl.POINTS })
+    trail.setParent(scene)
 
     // Dust motes
     const dn = W.dust.count
@@ -242,7 +290,9 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
 
     const t0 = performance.now()
     let smooth = 0
+    let lastT = 0
     const draw = (t: number) => {
+      const dt = Math.min(0.05, t - lastT); lastT = t
       const p = progress.current
       smooth += (p - smooth) * 0.12
       ptr.x += (ptr.tx - ptr.x) * W.pointer.lerp
@@ -263,13 +313,32 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
       dustProg.uniforms.uTime.value = t
       // trucks
       const span = T.pit.benches - 0.3
-      trucks.forEach((tr) => {
+      trucks.forEach((tr, ti) => {
         const raw = (tr.offset + tr.dir * t * W.trucks.speed) % span
         const tc = 0.15 + ((raw % span) + span) % span
         const a = roadPoint(tc), b = roadPoint(tc + 0.02 * tr.dir)
-        tr.node.position.set(a.x * 1.06, a.y + 0.004, a.z * 1.06)
+        tr.node.position.set(a.x, a.y + 0.004, a.z)
         tr.node.rotation.y = Math.atan2(-(b.z - a.z), b.x - a.x)
+        tr.wheels.forEach((wh) => { wh.rotation.y = t * 6 * tr.dir })
+        // trail: puffs drift up/back and die; respawn behind the rear axle
+        const dirx = Math.cos(tr.node.rotation.y), dirz = -Math.sin(tr.node.rotation.y)
+        for (let k = 0; k < W.trucks.trailPuffs; k++) {
+          const i = ti * W.trucks.trailPuffs + k
+          tlife[i] += dt * 0.6
+          if (tlife[i] >= 1) {
+            tlife[i] = 0
+            tpos[i * 3] = tr.node.position.x - dirx * 0.03 * W.trucks.scale
+            tpos[i * 3 + 1] = tr.node.position.y + 0.004
+            tpos[i * 3 + 2] = tr.node.position.z - dirz * 0.03 * W.trucks.scale
+          } else {
+            tpos[i * 3] += (-dirx * 0.012 + (tseed[i] - 0.5) * 0.01) * dt
+            tpos[i * 3 + 1] += 0.016 * dt
+            tpos[i * 3 + 2] += (-dirz * 0.012 + (tseed[i] - 0.5) * 0.01) * dt
+          }
+        }
       })
+      trailGeo.attributes.position.needsUpdate = true
+      trailProg.uniforms.uTime.value = t
       renderer.render({ scene: sky, camera, clear: true })
       renderer.render({ scene, camera, clear: false })
     }

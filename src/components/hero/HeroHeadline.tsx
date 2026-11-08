@@ -168,11 +168,23 @@ export const HeroHeadline = forwardRef<HeroHeadlineHandle, Props>(function HeroH
       if (!started) return
       const prev = prevIndex.current
       if (prev === index) return
+      // If a transition is still running (fast scroll / stage flapping), snap every other
+      // title out so an interrupted exit can never leave two headlines on screen.
+      const interrupted = !!master.current && master.current.progress() < 1
       master.current?.kill()
+      if (interrupted) {
+        titleRefs.current.forEach((el, i) => {
+          if (!el || i === index) return
+          gsap.set(el, { visibility: 'hidden' })
+          setHiddenState(i)
+        })
+      }
       const tl = gsap.timeline()
-      if (prev !== null && prev !== index) {
+      if (prev !== null && prev !== index && !interrupted) {
         tl.add(exit(prev), 0)
         tl.add(enter(index), HERO.headline.exit.duration - HERO.headline.overlap)
+      } else if (interrupted) {
+        tl.add(enter(index), 0)
       } else if (prev === null) {
         tl.add(enter(index), 0)
       }
