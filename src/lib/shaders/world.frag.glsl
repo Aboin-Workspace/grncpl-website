@@ -14,7 +14,15 @@ in vec3 vWorld;
 in float vDepth;
 in float vRoad;
 in float vBench;
+in float vRoadD;
 out vec4 fragColor;
+
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vnoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
+}
 
 void main() {
   // Flat (low-poly) shading from screen-space derivatives of the world position.
@@ -24,7 +32,18 @@ void main() {
   vec3 earth = mix(uSurface, uBenchCol, smoothstep(0.0, 0.3, vDepth) * vBench);
   vec3 col = mix(earth, uRock, smoothstep(0.08, 0.35, slope));
   col = mix(col, uDeep, smoothstep(0.30, 0.42, vDepth) * (1.0 - vRoad) * 0.85);
-  col = mix(col, uRoadCol, vRoad);
+  // Geological strata: thin light/dark bands on the rock faces by height.
+  float band = sin(vWorld.y * 260.0 + vnoise(vWorld.xz * 14.0) * 2.5);
+  float strata = smoothstep(0.08, 0.35, slope) * (0.55 + 0.45 * band);
+  col = mix(col, col * (0.78 + 0.34 * strata), smoothstep(0.08, 0.35, slope));
+  // Surface mottling: broken ground, loose spoil, tonal variety.
+  float m = vnoise(vWorld.xz * 38.0) * 0.6 + vnoise(vWorld.xz * 140.0) * 0.4;
+  col *= 0.86 + 0.28 * m;
+  // Haul road: packed grey with two darker tyre tracks and a dusty crown.
+  vec3 roadCol = uRoadCol * (0.92 + 0.16 * vnoise(vWorld.xz * 90.0));
+  float tracks = exp(-pow((abs(vRoadD) - 0.42) * 9.0, 2.0));
+  roadCol *= 1.0 - 0.22 * tracks;
+  col = mix(col, roadCol, vRoad);
   // Lighting: sun + hemisphere ambient.
   float diff = max(dot(n, normalize(uSun)), 0.0);
   float hemi = 0.5 + 0.5 * n.y;

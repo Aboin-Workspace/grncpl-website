@@ -9,10 +9,10 @@ const P = TERRAIN.pit
 const R = TERRAIN.road
 
 /** Road parameter tc ∈ [0, benches] → angle (rad), radius, height. */
-export function roadPoint(tc: number): { x: number; y: number; z: number; angle: number } {
+export function roadPoint(tc: number, lane = 0): { x: number; y: number; z: number; angle: number } {
   const t = Math.max(0, Math.min(P.benches, tc))
   const angle = (t / P.benches) * R.turns * TAU
-  const r = P.radius - t * P.benchWidth + 0.02
+  const r = P.radius - t * P.benchWidth + 0.02 + lane
   const y = -t * P.benchDepth
   return { x: r * Math.cos(angle), y, z: r * Math.sin(angle), angle }
 }

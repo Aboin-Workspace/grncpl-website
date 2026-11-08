@@ -22,9 +22,11 @@ const NotFound = lazy(() => import('@/pages/NotFound'))
 function Site() {
   const location = useLocation()
   const [started, setStarted] = useState(() => !shouldPreload())
+  // The preloader stays mounted through its curtain; `started` flips as the curtain begins to open.
+  const [preloading, setPreloading] = useState(() => shouldPreload())
   return (
     <AppStateContext.Provider value={{ started }}>
-      {!started && <Preloader pathname={location.pathname} onDone={() => setStarted(true)} />}
+      {preloading && <Preloader pathname={location.pathname} onReveal={() => setStarted(true)} onDone={() => { setStarted(true); setPreloading(false) }} />}
       <Grain />
       <Cursor />
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:bg-amber focus:px-4 focus:py-2 focus:text-ink">

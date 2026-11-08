@@ -45,6 +45,13 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
   const headline = useRef<HeroHeadlineHandle>(null)
   const particles = useRef<ParticleFieldHandle>(null)
   const progress = useRef(0)
+  const startedRef = useRef(started)
+  const introRef = useRef<{ t: number } | null>(null)
+  useEffect(() => {
+    startedRef.current = started
+    if (started && introRef.current && introRef.current.t < 1 && !reduced) gsap.to(introRef.current, { t: 1, duration: WORLD.intro.duration, ease: 'none' })
+    else if (started && introRef.current) introRef.current.t = 1
+  }, [started, reduced])
   const st = useRef<ScrollTrigger | null>(null)
   const [index, setIndex] = useState(0)
   const [dustReady, setDustReady] = useState(false)
@@ -209,7 +216,7 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
     const stackGeo = new Cylinder(gl, { radiusTop: 0.002, radiusBottom: 0.002, height: 0.018, radialSegments: 6 })
     const shadowGeo = new Cylinder(gl, { radiusTop: 0.052, radiusBottom: 0.052, height: 0.001, radialSegments: 18 })
     const shadowMat = new Program(gl, { vertex: propVert, fragment: `#version 300 es\nprecision highp float; in vec3 vWorld; out vec4 o; void main(){ o = vec4(0.0,0.0,0.0,0.45); }`, transparent: true, depthWrite: false })
-    const trucks: { node: Transform; offset: number; dir: number; wheels: Mesh[] }[] = []
+    const trucks: { node: Transform; offset: number; dir: number; wheels: Mesh[]; lane: number }[] = []
     for (let i = 0; i < W.trucks.count; i++) {
       const node = new Transform()
       node.scale.set(W.trucks.scale, W.trucks.scale, W.trucks.scale)
@@ -230,7 +237,8 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
         add(hubGeo, steel, x, 0.012, z, Math.PI / 2)
       }
       node.setParent(scene)
-      trucks.push({ node, offset: (i / W.trucks.count) * (T.pit.benches - 0.3) + 0.15, dir: i % 2 === 0 ? 1 : -1, wheels })
+      const dir = i % 2 === 0 ? 1 : -1
+      trucks.push({ node, offset: (i / W.trucks.count) * (T.pit.benches - 0.3) + 0.15, dir, wheels, lane: dir * W.trucks.laneOffset })
     }
 
     // Dust trails: a pool of puffs re-spawned at the rear of each truck.
@@ -290,6 +298,8 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
 
     const t0 = performance.now()
     let smooth = 0
+    const introState = { t: startedRef.current ? 1 : 0 }
+    introRef.current = introState
     let lastT = 0
     const draw = (t: number) => {
       const dt = Math.min(0.05, t - lastT); lastT = t
@@ -299,6 +309,12 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
       ptr.y += (ptr.ty - ptr.y) * W.pointer.lerp
       const pos = spline(posKeys, smooth)
       const look = spline(lookKeys, smooth)
+      // intro: ease from a far, high vantage into the first key
+      const k = introState.t
+      if (k < 1) {
+        const e = 1 - Math.pow(1 - k, 3)
+        for (let i = 0; i < 3; i++) pos[i] = W.intro.from[i] + (pos[i] - W.intro.from[i]) * e
+      }
       // pointer steers the look target sideways / up-down
       const fx = look[0] - pos[0], fz = look[2] - pos[2]
       const len = Math.hypot(fx, fz) || 1
@@ -316,7 +332,7 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
       trucks.forEach((tr, ti) => {
         const raw = (tr.offset + tr.dir * t * W.trucks.speed) % span
         const tc = 0.15 + ((raw % span) + span) % span
-        const a = roadPoint(tc), b = roadPoint(tc + 0.02 * tr.dir)
+        const a = roadPoint(tc, tr.lane), b = roadPoint(tc + 0.02 * tr.dir, tr.lane)
         tr.node.position.set(a.x, a.y + 0.004, a.z)
         tr.node.rotation.y = Math.atan2(-(b.z - a.z), b.x - a.x)
         tr.wheels.forEach((wh) => { wh.rotation.y = t * 6 * tr.dir })

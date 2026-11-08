@@ -10,6 +10,8 @@ import { PRELOAD_KEY } from '@/lib/preload'
 interface Props {
   /** Current pathname; on the home route the first hero image is part of the budget. */
   pathname: string
+  /** Fires when the curtain starts to open, so the page underneath can start its intro in sync. */
+  onReveal?: () => void
   onDone: () => void
 }
 
@@ -31,7 +33,7 @@ const WRIST = [566, 252] as const
  * cross-section; the amber cut line along the ground is the real progress. Min 1.6s / max 4s, then a
  * two-panel curtain from the centre. Runs once per session. Reduced motion: 400ms fade.
  */
-export function Preloader({ pathname, onDone }: Props) {
+export function Preloader({ pathname, onReveal, onDone }: Props) {
   const root = useRef<HTMLDivElement>(null)
   const counter = useRef<HTMLSpanElement>(null)
   const logo = useRef<HTMLImageElement>(null)
@@ -58,12 +60,14 @@ export function Preloader({ pathname, onDone }: Props) {
       const el = root.current
       if (!el) return onDone()
       if (reduced) {
+        onReveal?.()
         gsap.to(el, { opacity: 0, duration: PRELOADER.reducedMs / 1000, ease: 'power1.out', onComplete: () => { setDone(true); onDone() } })
         return
       }
       const tl = gsap.timeline({ onComplete: () => { setDone(true); onDone() } })
       tl.to(el.querySelectorAll('[data-pre-content]'), { opacity: 0, y: -16, duration: 0.35, ease: 'power2.in', stagger: 0.04 })
-      tl.to(el.querySelector('[data-curtain="top"]'), { scaleY: 0, transformOrigin: '50% 0%', duration: PRELOADER.curtainDuration, ease: EASE.expoInOut }, '-=0.05')
+      tl.call(() => onReveal?.(), [], '-=0.05')
+      tl.to(el.querySelector('[data-curtain="top"]'), { scaleY: 0, transformOrigin: '50% 0%', duration: PRELOADER.curtainDuration, ease: EASE.expoInOut }, '<')
       tl.to(el.querySelector('[data-curtain="bottom"]'), { scaleY: 0, transformOrigin: '50% 100%', duration: PRELOADER.curtainDuration, ease: EASE.expoInOut }, '<')
     }
 

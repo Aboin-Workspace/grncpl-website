@@ -19,6 +19,7 @@ out vec3 vWorld;
 out float vDepth;
 out float vRoad;
 out float vBench;
+out float vRoadD; // -1..1 across the road width
 
 vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
 vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -80,6 +81,8 @@ void main() {
   float d = mod(ang - roadAng + TAU * 2.0, TAU);
   d = min(d, TAU - d);
   float road = (1.0 - smoothstep(0.0, uRoadWidth, d)) * step(0.001, tc) * (1.0 - step(uBenches - 0.001, tc));
+  float sd = mod(ang - roadAng + TAU * 2.0 + TAU * 0.5, TAU) - TAU * 0.5;
+  vRoadD = clamp(sd / uRoadWidth, -1.0, 1.0);
   float h = mix(stepped, smoothH, road);
   float n = snoise(vec3(xz * uNoiseFreq, 3.0)) * 0.7 + snoise(vec3(xz * uNoiseFreq * 2.1, 7.0)) * 0.3;
   float outer = smoothstep(uPitRadius - 0.02, uPitRadius + 0.6, r);

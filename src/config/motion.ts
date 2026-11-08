@@ -251,7 +251,9 @@ export const WORLD = {
     deep: [0.24, 0.22, 0.20] as [number, number, number],
     road: [0.46, 0.41, 0.35] as [number, number, number],
   },
-  trucks: { count: 7, speed: 0.11, paint: [0.93, 0.70, 0.12] as [number, number, number], scale: 0.6, trailPuffs: 14, trailAlpha: 0.22 },
+  trucks: { count: 7, speed: 0.11, paint: [0.93, 0.70, 0.12] as [number, number, number], scale: 0.6, trailPuffs: 14, trailAlpha: 0.22, /** Radial lane offset (mesh units) so opposing trucks pass each other. */ laneOffset: 0.02 },
+  /** Intro fly-in when the preloader lifts: from a high, distant vantage into the aerial stage. */
+  intro: { from: [0.9, 3.2, 4.2] as [number, number, number], duration: 3.2 },
   /** Fraction of a stage the scroll must pass a boundary by before the headline changes. */
   stageHysteresis: 0.08,
   pointer: { yaw: 0.14, pitch: 0.07, lerp: 0.05 },
