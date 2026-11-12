@@ -84,7 +84,7 @@ export const SlideChrome = forwardRef<HTMLDivElement, Props>(function SlideChrom
                     data-paused={paused ? '' : undefined}
                   />
                 </span>
-                <span className="hidden aspect-[16/6] overflow-hidden md:block" aria-hidden="true">
+                <span className="hero-thumb hidden overflow-hidden md:block" aria-hidden="true">
                   <img src={s.image.srcSmall} alt="" width={320} height={120} loading="lazy" decoding="async" className={`h-full w-full object-cover transition-opacity duration-slow ease-expo-out ${active ? 'thumb-live opacity-100' : 'opacity-55 group-hover:opacity-90'}`} />
                 </span>
                 <span className="flex items-center gap-3 px-3 py-2.5 md:px-4 md:py-3">

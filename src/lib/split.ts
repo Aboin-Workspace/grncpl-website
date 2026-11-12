@@ -6,6 +6,8 @@
 export interface SplitOptions {
   /** Words (exact, case-sensitive) that receive the `accent` class on every char. */
   accentWords?: string[]
+  /** Put each accent word on its own line so the lockup stays two lines as the type scales. */
+  breakBeforeAccent?: boolean
   lineClass?: string
   wordClass?: string
   charClass?: string
@@ -23,6 +25,7 @@ export interface SplitResult {
 export function splitText(el: HTMLElement, opts: SplitOptions = {}): SplitResult {
   const {
     accentWords = [],
+    breakBeforeAccent = false,
     lineClass = 'split-line',
     wordClass = 'split-word',
     charClass = 'split-char',
@@ -47,10 +50,14 @@ export function splitText(el: HTMLElement, opts: SplitOptions = {}): SplitResult
   const chars: HTMLElement[] = []
   const accentChars: HTMLElement[] = []
 
-  original.split(/\s+/).filter(Boolean).forEach((word, i, arr) => {
+  original.split(/\s+/).filter(Boolean).forEach((word, i) => {
     const w = document.createElement('span')
     w.className = wordClass
     const isAccent = accentWords.includes(word)
+    if (i > 0) {
+      if (breakBeforeAccent && isAccent) visual.appendChild(document.createElement('br'))
+      else visual.appendChild(document.createTextNode(' '))
+    }
     for (const ch of Array.from(word)) {
       const c = document.createElement('span')
       c.className = isAccent ? `${charClass} ${accentClass}` : charClass
@@ -61,7 +68,6 @@ export function splitText(el: HTMLElement, opts: SplitOptions = {}): SplitResult
     }
     visual.appendChild(w)
     words.push(w)
-    if (i < arr.length - 1) visual.appendChild(document.createTextNode(' '))
   })
 
   // Group words into lines by their rendered top offset.

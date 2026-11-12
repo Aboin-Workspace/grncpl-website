@@ -774,10 +774,10 @@ export function WorldHero({ slides, subtext, started = true }: Props) {
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[5] h-[34vh] min-h-[180px] bg-scrim-top" aria-hidden="true" />
       {!reduced && dustReady && <ParticleField ref={particles} pointerTarget={root} />}
 
-      <div ref={headlineWrap} className="pointer-events-none absolute inset-x-gutter bottom-[6.5rem] z-10 md:bottom-[8.5rem] lg:right-[16rem] lg:bottom-[9rem]">
+      <div ref={headlineWrap} className="hero-copy hero-world pointer-events-none absolute inset-x-gutter z-10 flex flex-col justify-end lg:right-[16rem]">
         <HeroHeadline ref={headline} slides={slides} index={index} subtext={subtext} started={started} reduced={reduced} />
         <m.div
-          className="pointer-events-auto mt-6 flex flex-wrap gap-3 md:mt-8"
+          className="pointer-events-auto mt-[var(--hero-gap)] flex flex-wrap gap-3"
           initial={reduced ? false : { opacity: 0, y: 16 }}
           animate={started ? { opacity: 1, y: 0 } : undefined}
           transition={{ duration: 0.7, delay: reduced ? 0 : 1.1, ease: [0.16, 1, 0.3, 1] }}

@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react'
+import { Fragment, forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react'
 import { gsap } from '@/lib/gsap'
 import { splitText, type SplitResult } from '@/lib/split'
 import { HERO, DURATION } from '@/config/motion'
@@ -111,10 +111,11 @@ export const HeroHeadline = forwardRef<HeroHeadlineHandle, Props>(function HeroH
     if (reduced) return
     let cancelled = false
     let lastW = 0
+    let lastH = 0
     const doSplit = () => {
       splits.current.forEach((s) => s?.revert())
       splits.current = titleRefs.current.map((el, i) =>
-        el ? splitText(el, { accentWords: [slides[i].accent], accentClass: 'is-accent text-outline' }) : null,
+        el ? splitText(el, { accentWords: [slides[i].accent], accentClass: 'is-accent text-outline', breakBeforeAccent: true }) : null,
       )
       splits.current.forEach((s) => {
         s?.lines.forEach((l) => {
@@ -133,11 +134,16 @@ export const HeroHeadline = forwardRef<HeroHeadlineHandle, Props>(function HeroH
     ready.then(() => {
       if (cancelled) return
       lastW = window.innerWidth
+      lastH = window.innerHeight
       doSplit()
     })
     const onResize = () => {
-      if (window.innerWidth === lastW) return
-      lastW = window.innerWidth
+      const w = window.innerWidth
+      const h = window.innerHeight
+      // Height matters too: the headline size is capped by the vertical band.
+      if (w === lastW && Math.abs(h - lastH) < 24) return
+      lastW = w
+      lastH = h
       master.current?.kill()
       master.current = null
       doSplit()
@@ -216,11 +222,11 @@ export const HeroHeadline = forwardRef<HeroHeadlineHandle, Props>(function HeroH
           >
             {reduced ? (
               <>
-                {s.title.split(' ').map((w, wi, arr) => (
-                  <span key={wi} className={w === s.accent ? 'text-amber' : undefined}>
-                    {w}
-                    {wi < arr.length - 1 ? ' ' : ''}
-                  </span>
+                {s.title.split(' ').map((w, wi) => (
+                  <Fragment key={wi}>
+                    {wi > 0 ? (w === s.accent ? <br /> : ' ') : null}
+                    <span className={w === s.accent ? 'text-amber' : undefined}>{w}</span>
+                  </Fragment>
                 ))}
               </>
             ) : (
@@ -231,7 +237,7 @@ export const HeroHeadline = forwardRef<HeroHeadlineHandle, Props>(function HeroH
       </div>
       <p
         ref={subRef}
-        className="mt-6 max-w-[34rem] text-balance font-body text-body-lg text-bone/80 md:mt-8"
+        className="hero-sub mt-[var(--hero-gap)] max-w-[34rem] text-balance font-body text-body-lg text-bone/80"
         style={reduced ? undefined : { opacity: 0 }}
       >
         {subtext}

@@ -48,8 +48,8 @@
   --dur-base: 600ms;
   --dur-slow: 1100ms;
   --dur-liquid: 1400ms;
-  /* Hero headline: 16vw mobile, 13vw desktop (brief allows 12–18vw). */
-  --hero-size: 15vw;
+  /* Space between the hero headline, the subtext, and the buttons. */
+  --hero-gap: 1.5rem;
   color-scheme: dark;
 }
 
@@ -89,10 +89,19 @@ html[data-theme='light'] {
   color-scheme: dark;
 }
 @media (min-width: 768px) {
-  :root { --gutter: 32px; }
+  :root { --gutter: 32px; --hero-gap: 2rem; }
 }
 @media (min-width: 1024px) {
-  :root { --gutter: 48px; --hero-size: min(11vw, 16rem); }
+  :root { --gutter: 48px; }
+}
+/* Short laptops: pull the copy off the stage rail and tighten the stack
+   so the headline can stay large without running under the header. */
+@media (max-height: 760px) {
+  :root { --hero-gap: 1rem; }
+}
+@media (max-height: 680px) {
+  :root { --hero-gap: 0.75rem; }
+  .hero-sub { font-size: 0.9375rem; line-height: 1.45; }
 }
 
 html { background: var(--ink); }
@@ -120,12 +129,56 @@ html.lenis, html.lenis body { height: auto; }
 
 /* ---------- Display type ---------- */
 .font-display { letter-spacing: 0.01em; }
+/* The copy block fills the band under the header and above the stage rail.
+   Headline size follows that band (cqh) as well as the width, so a short
+   laptop shrinks the type instead of sliding it under the navigation. */
+.hero-copy {
+  top: 6rem;
+  bottom: var(--hero-anchor, 6.5rem);
+  container-type: size;
+}
+.hero-world { --hero-anchor: 6.5rem; }
+.hero-photo { --hero-anchor: 6.5rem; }
+@media (min-width: 768px) {
+  .hero-world { --hero-anchor: 8.5rem; }
+  .hero-photo { --hero-anchor: 11.5rem; }
+}
+@media (min-width: 1024px) {
+  .hero-world { --hero-anchor: 9rem; }
+  .hero-photo { --hero-anchor: 12.5rem; }
+}
+@media (max-height: 760px) {
+  .hero-world { --hero-anchor: 7.25rem; }
+  .hero-photo { --hero-anchor: 9.25rem; }
+}
+.hero-thumb { aspect-ratio: 16 / 6; }
+@media (min-width: 768px) and (max-height: 760px) {
+  .hero-thumb { aspect-ratio: 16 / 3.2; }
+}
 .text-hero {
   font-family: 'Bebas Neue', Impact, 'Arial Narrow', sans-serif;
-  font-size: var(--hero-size);
+  /* Fallback when the headline is not inside a sized .hero-copy. */
+  font-size: min(15vw, 16rem);
+  font-size: max(2.75rem, min(15vw, 16rem, calc((100cqh - 15rem) / 1.8)));
   line-height: 0.9;
   letter-spacing: 0.01em;
   text-transform: uppercase;
+}
+@media (min-width: 1024px) {
+  .text-hero {
+    font-size: min(11vw, 16rem);
+    font-size: max(2.75rem, min(11vw, 16rem, calc((100cqh - 15rem) / 1.8)));
+  }
+}
+@media (max-height: 760px) {
+  .text-hero {
+    font-size: max(2.75rem, min(15vw, 16rem, calc((100cqh - 12.5rem) / 1.8)));
+  }
+}
+@media (min-width: 1024px) and (max-height: 760px) {
+  .text-hero {
+    font-size: max(2.75rem, min(11vw, 16rem, calc((100cqh - 12.5rem) / 1.8)));
+  }
 }
 .text-outline {
   color: transparent;

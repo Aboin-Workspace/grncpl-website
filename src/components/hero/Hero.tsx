@@ -250,12 +250,12 @@ export function Hero({ slides, subtext, started = true, forceFallback = false }:
       />
 
       {/* Layer 4 — headline */}
-      <div ref={headlineWrap} className="pointer-events-none absolute inset-x-gutter bottom-[6.5rem] z-10 md:bottom-[11.5rem] lg:right-[16rem] lg:bottom-[12.5rem]">
-        <m.div style={{ x: sx, y: sy }}>
+      <div ref={headlineWrap} className="hero-copy hero-photo pointer-events-none absolute inset-x-gutter z-10 flex flex-col justify-end lg:right-[16rem]">
+        <m.div className="w-full" style={{ x: sx, y: sy }}>
           <HeroHeadline ref={headline} slides={slides} index={index} subtext={subtext} started={started} reduced={reduced} />
           {/* CTAs: existing nav destinations, revealed after the headline settles */}
           <m.div
-            className="pointer-events-auto mt-6 flex flex-wrap gap-3 md:mt-8"
+            className="pointer-events-auto mt-[var(--hero-gap)] flex flex-wrap gap-3"
             initial={reduced ? false : { opacity: 0, y: 16 }}
             animate={started ? { opacity: 1, y: 0 } : undefined}
             transition={{ duration: 0.7, delay: reduced ? 0 : 1.1, ease: [0.16, 1, 0.3, 1] }}
