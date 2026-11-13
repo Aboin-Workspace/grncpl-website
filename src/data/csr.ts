@@ -39,6 +39,36 @@ export const CSR_PYRAMID: CsrTier[] = [
   { abbr: 'ER', title: 'Economic Responsibility', motto: 'Be profitable' },
 ]
 
+/**
+ * Latest CSR recognition, shown as the featured block on the CSR hub. Copy is verbatim from GRN's announcement.
+ * The facts row is lifted from that same copy; the date is the one printed on the event backdrop.
+ * TODO(client): confirm the event date, and that GRN may republish the news clip (footage: Mahaa News).
+ */
+export const CSR_ACHIEVEMENT = {
+  eyebrow: 'Latest recognition',
+  date: '24 July 2026',
+  title: 'Empowering Education | Building a Better Tomorrow',
+  amount: { value: 4, prefix: '₹', suffix: ' crore', label: 'CSR contribution towards school infrastructure' },
+  facts: [
+    { label: 'Honoured', value: 'Shri Ganta Ramanaiah Naidu' },
+    { label: 'Recognition', value: 'Certificate of Appreciation' },
+    { label: 'Awarded by', value: 'School Education Department, Government of Andhra Pradesh' },
+    { label: 'School', value: 'ZPHS Housing Board Colony, Kallurupalli, Nellore, SPS Nellore District' },
+  ],
+  paragraphs: [
+    'We are delighted to share that Shri Ganta Ramanaiah Naidu has been honoured with a Certificate of Appreciation by the School Education Department, Government of Andhra Pradesh, recognizing a significant contribution of ₹4 crore under Corporate Social Responsibility (CSR) activities towards the infrastructure development of ZPHS Housing Board Colony, Kallurupalli, Nellore, SPS Nellore District.',
+    'The Certificate of Appreciation, signed by Shri Nara Lokesh, Hon’ble Minister for HRD, IT, Electronics & Communications, and RTG, Government of Andhra Pradesh, recognizes this meaningful initiative towards strengthening educational infrastructure and providing students with an improved and conducive learning environment.',
+    'At GRN Constructions, we believe that education is one of the strongest foundations for sustainable social development. Our CSR initiatives reflect our commitment to supporting communities, enhancing access to quality educational infrastructure, and creating opportunities that enable future generations to learn, grow, and succeed.',
+    'This recognition is a proud milestone in our CSR journey and reinforces our commitment to making a meaningful and lasting contribution to society.',
+  ],
+  tagline: ['Building Infrastructure.', 'Empowering Education.', 'Shaping the Future.'],
+  video: { src: '/videos/csr-zphs-appreciation.mp4', poster: '/images/csr/zphs-appreciation-1.webp', label: 'Watch the Certificate of Appreciation being presented', credit: 'Footage: Mahaa News' },
+  photos: [
+    { src: '/images/csr/zphs-appreciation-2.webp', alt: 'Applause on stage as the Certificate of Appreciation is handed over at the School Education Department event' },
+    { src: '/images/csr/zphs-appreciation-3.webp', alt: 'Congratulations on stage after the Certificate of Appreciation is received' },
+  ],
+} as const
+
 export const CSR_PILLARS: CsrPillar[] = [
   {
     slug: 'svastha-health', href: '/svastha-health/', name: 'Svastha', theme: 'Health',

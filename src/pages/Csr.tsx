@@ -8,6 +8,7 @@ import { Reveal } from '@/components/motion/Reveal'
 import { NumberedList } from '@/components/ui/NumberedList'
 import { ParallaxImage } from '@/components/ui/ParallaxImage'
 import { ResponsibilityPyramid } from '@/components/csr/ResponsibilityPyramid'
+import { CsrAchievement } from '@/components/csr/CsrAchievement'
 import { useDisplayLocation } from '@/lib/displayLocation'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
 
@@ -75,7 +76,8 @@ export default function Csr() {
               <Eyebrow>{H.eyebrow}</Eyebrow>
               <SplitText as="h1" text={H.title} immediate className="mt-4 font-display text-display-xl uppercase text-bone" />
             </Section>
-            <Section tone="coal" aria-label="The four responsibilities" className="overflow-hidden">
+            <CsrAchievement />
+            <Section aria-label="The four responsibilities" className="overflow-hidden">
               <div className="pointer-events-none absolute -left-32 top-1/2 h-[60vw] w-[60vw] -translate-y-1/2 rounded-full bg-amber/10 blur-[140px]" aria-hidden="true" />
               {/* Replaces the old stock pyramid image (CSR.jpg) with the same four tiers, drawn live. */}
               <ResponsibilityPyramid className="relative" />

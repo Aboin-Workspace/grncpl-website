@@ -316,4 +316,12 @@ export const VALUES_WHEEL = {
   lift: { scale: 1.04, spring: { type: 'spring', stiffness: 300, damping: 24 } as const },
 } as const
 
+export const ACHIEVEMENT = {
+  /** Video frame opens from a centre slit on scroll entry. */
+  reveal: { duration: 1.3, ease: [0.87, 0, 0.13, 1] as [number, number, number, number] },
+  photo: { stagger: 0.15, duration: 0.9, rotate: [-2.5, 2] as [number, number] },
+  tagline: { stagger: 0.18, duration: 0.9 },
+  ringSeconds: 2.4,
+} as const
+
 export const CHART = { barDuration: 1200, barStagger: 90, lineDuration: 1600, lineDelay: 500 } as const
